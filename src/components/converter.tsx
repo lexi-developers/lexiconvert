@@ -10,6 +10,7 @@ import {
   Download,
   AlertCircle,
   Loader,
+  Image as ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -52,12 +53,17 @@ export function Converter() {
   const handleFileChange = (files: FileList | null) => {
     if (files && files.length > 0) {
       const selectedFile = files[0];
-      const supportedTypes = ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"];
+      const supportedTypes = [
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
+        "text/plain",
+        "image/jpeg",
+        "image/png"
+      ];
       if (!supportedTypes.includes(selectedFile.type)) {
         toast({
           variant: "destructive",
           title: "檔案格式不受支援",
-          description: "目前僅支援 .docx 和 .txt 檔案。",
+          description: "目前僅支援 .docx, .txt, .jpg, 和 .png 檔案。",
         });
         return;
       }
@@ -100,37 +106,52 @@ export function Converter() {
     try {
       const arrayBuffer = await file.arrayBuffer();
       const pdfDoc = await PDFDocument.create();
-      const page = pdfDoc.addPage();
-      const { width, height } = page.getSize();
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const fontSize = 12;
-      let textContent = "";
       
-      if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-        // The 'docx' library is primarily for creating documents.
-        // Reading and extracting text is not a direct feature.
-        // For this example, we'll show a placeholder message.
-        // A more advanced solution would need a different library for DOCX parsing.
-        textContent = "DOCX parsing is complex and not fully supported in this offline version. This is a placeholder.";
-        toast({
-          title: "注意",
-          description: "DOCX 內容解析功能受限。",
-        });
+      if (file.type.startsWith('image/')) {
+        let image;
+        if (file.type === 'image/jpeg') {
+            image = await pdfDoc.embedJpg(arrayBuffer);
+        } else if (file.type === 'image/png') {
+            image = await pdfDoc.embedPng(arrayBuffer);
+        } else {
+            throw new Error('Unsupported image type');
+        }
         
-      } else if (file.type === "text/plain") {
-        const decoder = new TextDecoder("utf-8");
-        textContent = decoder.decode(arrayBuffer);
+        const page = pdfDoc.addPage([image.width, image.height]);
+        page.drawImage(image, {
+            x: 0,
+            y: 0,
+            width: image.width,
+            height: image.height,
+        });
+      } else {
+        const page = pdfDoc.addPage();
+        const { width, height } = page.getSize();
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const fontSize = 12;
+        let textContent = "";
+        
+        if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+          textContent = "DOCX parsing is complex and not fully supported in this offline version. This is a placeholder.";
+          toast({
+            title: "注意",
+            description: "DOCX 內容解析功能受限。",
+          });
+        } else if (file.type === "text/plain") {
+          const decoder = new TextDecoder("utf-8");
+          textContent = decoder.decode(arrayBuffer);
+        }
+        
+        page.drawText(textContent, {
+          x: 50,
+          y: height - 4 * fontSize,
+          font,
+          size: fontSize,
+          color: rgb(0, 0, 0),
+          maxWidth: width - 100,
+          lineHeight: 15,
+        });
       }
-      
-      page.drawText(textContent, {
-        x: 50,
-        y: height - 4 * fontSize,
-        font,
-        size: fontSize,
-        color: rgb(0, 0, 0),
-        maxWidth: width - 100,
-        lineHeight: 15,
-      });
 
       const pdfBytes = await pdfDoc.save();
       const blob = new Blob([pdfBytes], { type: "application/pdf" });
@@ -161,12 +182,20 @@ export function Converter() {
     return `${nameWithoutExtension}.pdf`;
   }
 
+  const getFileIcon = () => {
+    if (!file) return null;
+    if (file.type.startsWith('image/')) {
+      return <ImageIcon className="h-4 w-4" />;
+    }
+    return <FileText className="h-4 w-4" />;
+  }
+
   return (
     <Card className="w-full shadow-lg">
       <CardHeader>
         <CardTitle>離線檔案轉換器</CardTitle>
         <CardDescription>
-          將您的 .docx 或 .txt 檔案安全地轉換為 PDF。
+          將您的檔案安全地轉換為 PDF，完全在您的瀏覽器中完成。
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -186,19 +215,19 @@ export function Converter() {
             <p className="mt-4 text-center text-muted-foreground">
               <span className="font-semibold text-primary">點擊上傳</span> 或拖放檔案
             </p>
-            <p className="text-xs text-muted-foreground mt-1">目前支援 .docx 和 .txt 格式。</p>
+            <p className="text-xs text-muted-foreground mt-1">目前支援 .docx, .txt, .jpg, .png</p>
             <input
               ref={fileInputRef}
               type="file"
               className="hidden"
-              accept=".docx,.txt"
+              accept=".docx,.txt,.jpg,.jpeg,.png"
               onChange={(e) => handleFileChange(e.target.files)}
             />
           </div>
         ) : (
           <div className="space-y-4">
             <Alert variant="default" className="border-primary/20">
-              <FileText className="h-4 w-4" />
+              {getFileIcon()}
               <AlertTitle>{file.name}</AlertTitle>
               <AlertDescription className="flex justify-between items-center">
                 <span>檔案已準備好轉換為 PDF。</span>
