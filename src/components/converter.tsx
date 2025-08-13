@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { PDFDocument, StandardFonts } from "pdf-lib";
-import { Document, Packer, Paragraph, TextRun } from "docx";
 import {
   UploadCloud,
   FileText,
@@ -11,6 +9,7 @@ import {
   CheckCircle,
   Download,
   AlertCircle,
+  Loader,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -32,16 +31,25 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 
-type ConversionStatus = "idle" | "converting" | "success" | "error";
+type ConversionStatus = "idle" | "uploading" | "converting" | "success" | "error";
 
-const CONVERSION_FORMATS = ["PDF", "DOCX", "TXT", "HTML", "JSON", "MD"];
+// Abridged list of some popular formats, more can be added
+const CONVERSION_FORMATS = [
+    "pdf", "docx", "pptx", "xlsx", "jpg", "png", "gif", "mp3", "wav", "mp4", 
+    "mov", "avi", "txt", "html", "epub", "mobi", "azw3", "odt", "ods", "odp",
+    "rtf", "tex", "csv", "xml", "json", "md", "zip", "rar", "7z", "tar", "gz",
+    "svg", "webp", "bmp", "tiff", "ico", "flac", "ogg", "wma", "m4a", "aac",
+    "mkv", "flv", "webm", "wmv", "mpg", "doc", "xls", "ppt", "key", "numbers", "pages"
+];
+
+const API_KEY = "d3228b38038b55694c97484e8785718a"; // THIS IS A DEMO KEY
 
 export function Converter() {
   const [file, setFile] = useState<File | null>(null);
   const [outputFormat, setOutputFormat] = useState<string>(CONVERSION_FORMATS[0]);
   const [status, setStatus] = useState<ConversionStatus>("idle");
-  const [conversionProgress, setConversionProgress] = useState<number>(0);
-  const [convertedFile, setConvertedFile] = useState<{ name: string; content: string | Uint8Array; type: string; } | null>(null);
+  const [statusText, setStatusText] = useState<string>("");
+  const [convertedFile, setConvertedFile] = useState<{ name: string; url: string; } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -50,7 +58,7 @@ export function Converter() {
   const resetState = useCallback(() => {
     setFile(null);
     setStatus("idle");
-    setConversionProgress(0);
+    setStatusText("");
     setConvertedFile(null);
     setErrorMessage("");
     if (fileInputRef.current) {
@@ -60,6 +68,14 @@ export function Converter() {
 
   const handleFileChange = (files: FileList | null) => {
     if (files && files.length > 0) {
+      if (files[0].size > 100 * 1024 * 1024) { // 100MB limit for demo key
+        toast({
+          variant: "destructive",
+          title: "檔案太大",
+          description: "免費版金鑰不支援超過 100MB 的檔案。",
+        });
+        return;
+      }
       resetState();
       setFile(files[0]);
     }
@@ -88,126 +104,87 @@ export function Converter() {
     setIsDragging(false);
     handleFileChange(e.dataTransfer.files);
   };
+  
+  const pollConversionStatus = async (id: string) => {
+    setStatusText("正在轉換檔案...");
+    try {
+      while(true) {
+        const statusRes = await fetch(`https://api.convertio.co/convert/${id}/status`);
+        const statusData = await statusRes.json();
+        
+        if (statusData.status === 'error') {
+            throw new Error(statusData.error || "轉換過程中發生錯誤。");
+        }
+        
+        if (statusData.data.step === 'finish') {
+            const fileData = statusData.data.output.files[0];
+            setConvertedFile({ name: fileData.name, url: fileData.url });
+            setStatus("success");
+            setStatusText("轉換成功！");
+            return;
+        }
+
+        setStatusText(`正在轉換... (${statusData.data.step_percent || 0}%)`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Poll every 2 seconds
+      }
+    } catch (err: any) {
+        setStatus("error");
+        const errorMsg = err.message || "無法確認轉換狀態。";
+        setErrorMessage(errorMsg);
+        toast({
+          variant: "destructive",
+          title: "轉換錯誤",
+          description: errorMsg,
+        });
+    }
+  };
 
   const handleConvert = async () => {
     if (!file) return;
 
-    setStatus("converting");
-    setConversionProgress(0);
+    setStatus("uploading");
+    setStatusText("正在上傳檔案...");
     setConvertedFile(null);
     setErrorMessage("");
 
-    const progressInterval = setInterval(() => {
-      setConversionProgress((prev) => {
-        if (prev >= 95) {
-          clearInterval(progressInterval);
-          return prev;
-        }
-        return prev + 5;
-      });
-    }, 100);
-
     try {
-      const fileContent = await file.text();
-      let convertedContent: string | Uint8Array;
-      const newExtension = outputFormat.toLowerCase();
-      
-      const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-      const newFileName = `${baseName}.${newExtension}`;
-      let blobType = "text/plain;charset=utf-8";
-      
-      switch(outputFormat) {
-          case 'PDF': {
-            const pdfDoc = await PDFDocument.create();
-            const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-            const textSize = 11;
-            const margin = 50;
-            const textLines = fileContent.split('\n');
-            
-            let page = pdfDoc.addPage();
-            let { height } = page.getSize();
-            let y = height - margin;
+      const formData = new FormData();
+      formData.append("apikey", API_KEY);
+      formData.append("file", file);
+      formData.append("outputformat", outputFormat);
 
-            for (const line of textLines) {
-              if (y < margin) {
-                page = pdfDoc.addPage();
-                height = page.getHeight();
-                y = height - margin;
-              }
-              page.drawText(line, { x: margin, y, font, size: textSize });
-              y -= textSize * 1.4;
-            }
+      const res = await fetch("https://api.convertio.co/convert", {
+        method: "POST",
+        body: formData,
+      });
 
-            convertedContent = await pdfDoc.save();
-            blobType = "application/pdf";
-            break;
-          }
-          case 'DOCX': {
-            const doc = new Document({
-              sections: [{
-                children: fileContent.split('\n').map(line => new Paragraph({ children: [new TextRun(line)] })),
-              }],
-            });
-            convertedContent = await Packer.toBuffer(doc);
-            blobType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-            break;
-          }
-          case 'HTML':
-              convertedContent = `<!DOCTYPE html>\n<html>\n<head>\n  <title>${file.name}</title>\n</head>\n<body>\n  <pre>${fileContent}</pre>\n</body>\n</html>`;
-              break;
-          case 'JSON':
-              convertedContent = JSON.stringify({ source: file.name, content: fileContent }, null, 2);
-              break;
-          case 'MD':
-              convertedContent = `# ${file.name}\n\n${fileContent}`;
-              break;
-          default: // TXT
-              convertedContent = fileContent;
-              break;
+      const data = await res.json();
+
+      if (data.status === "error") {
+        throw new Error(data.error || "檔案上傳失敗。");
       }
       
-      clearInterval(progressInterval);
-      setConversionProgress(100);
-      
-      setTimeout(() => {
-        setConvertedFile({ name: newFileName, content: convertedContent, type: blobType });
-        setStatus("success");
-      }, 300);
+      setStatus("converting");
+      await pollConversionStatus(data.data.id);
 
-    } catch (err) {
-      clearInterval(progressInterval);
+    } catch (err: any) {
       setStatus("error");
-      const errorMsg = "Failed to read or convert the file. Please ensure it's a valid file.";
+      const errorMsg = err.message || "無法讀取或轉換檔案。請確保檔案有效。";
       setErrorMessage(errorMsg);
       toast({
         variant: "destructive",
-        title: "Conversion Error",
+        title: "轉換錯誤",
         description: errorMsg,
       });
     }
   };
 
-  const handleDownload = () => {
-    if (!convertedFile) return;
-
-    const blob = new Blob([convertedFile.content], { type: convertedFile.type });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = convertedFile.name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-
   return (
     <Card className="w-full shadow-lg">
       <CardHeader>
-        <CardTitle>File Converter</CardTitle>
+        <CardTitle>檔案轉換器</CardTitle>
         <CardDescription>
-          Upload a document and select the format to convert.
+          支援超過 50 種格式，由 Convertio.co 提供技術支援。
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -225,9 +202,9 @@ export function Converter() {
           >
             <UploadCloud className="w-12 h-12 text-muted-foreground" />
             <p className="mt-4 text-center text-muted-foreground">
-              <span className="font-semibold text-primary">Click to upload</span> or drag and drop
+              <span className="font-semibold text-primary">點擊上傳</span> 或拖放檔案
             </p>
-            <p className="text-xs text-muted-foreground mt-1">Supports PDF, DOCX, TXT, and other text-based files.</p>
+            <p className="text-xs text-muted-foreground mt-1">支援圖像、文件、影片、音訊等格式。</p>
             <input
               ref={fileInputRef}
               type="file"
@@ -241,7 +218,7 @@ export function Converter() {
               <FileText className="h-4 w-4" />
               <AlertTitle>{file.name}</AlertTitle>
               <AlertDescription className="flex justify-between items-center">
-                <span>File ready for conversion.</span>
+                <span>檔案已準備好進行轉換。</span>
                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={resetState}>
                   <X className="h-4 w-4" />
                 </Button>
@@ -251,7 +228,7 @@ export function Converter() {
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <Select value={outputFormat} onValueChange={setOutputFormat}>
                 <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Select output format" />
+                  <SelectValue placeholder="選擇輸出格式" />
                 </SelectTrigger>
                 <SelectContent>
                   {CONVERSION_FORMATS.map((format) => (
@@ -263,32 +240,34 @@ export function Converter() {
               </Select>
               <Button
                 onClick={handleConvert}
-                disabled={status === "converting"}
+                disabled={status === "converting" || status === "uploading"}
                 className="w-full sm:w-auto"
               >
                 <ArrowRight className="mr-2 h-4 w-4" />
-                Convert
+                轉換
               </Button>
             </div>
           </div>
         )}
 
-        {status === "converting" && (
-            <div className="space-y-2 text-center">
-                <Progress value={conversionProgress} className="w-full" />
-                <p className="text-sm text-muted-foreground">Converting...</p>
+        {(status === "uploading" || status === "converting") && (
+            <div className="space-y-2 text-center flex items-center justify-center">
+                <Loader className="mr-2 h-4 w-4 animate-spin" />
+                <p className="text-sm text-muted-foreground">{statusText}</p>
             </div>
         )}
 
         {status === "success" && convertedFile && (
           <Alert variant="default" className="bg-green-50 border-green-200">
             <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertTitle className="text-green-800">Conversion Successful!</AlertTitle>
+            <AlertTitle className="text-green-800">轉換成功！</AlertTitle>
             <AlertDescription className="flex flex-col sm:flex-row justify-between items-center gap-2 mt-2 text-green-700">
-              Your file <span className="font-semibold">{convertedFile.name}</span> is ready.
-              <Button onClick={handleDownload} size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                Download
+              您的檔案 <span className="font-semibold">{convertedFile.name}</span> 已準備就緒。
+              <Button asChild size="sm">
+                <a href={convertedFile.url} download target="_blank" rel="noopener noreferrer">
+                  <Download className="mr-2 h-4 w-4" />
+                  下載
+                </a>
               </Button>
             </AlertDescription>
           </Alert>
@@ -297,7 +276,7 @@ export function Converter() {
         {status === "error" && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Conversion Failed</AlertTitle>
+            <AlertTitle>轉換失敗</AlertTitle>
             <AlertDescription>{errorMessage}</AlertDescription>
           </Alert>
         )}
