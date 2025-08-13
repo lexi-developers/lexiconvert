@@ -9,7 +9,7 @@ export default function Home() {
             LexiConvert
           </h1>
           <p className="text-muted-foreground mt-2 text-lg">
-            上傳您的文件，選擇目標格式，我們將在幾秒鐘內為您轉換。
+            您的離線檔案轉換工具，安全可靠。
           </p>
         </header>
         <Converter />
