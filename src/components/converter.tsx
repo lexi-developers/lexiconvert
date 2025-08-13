@@ -33,6 +33,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
+
 // === TYPES AND CONSTANTS ===
 
 type ConversionStatus = "idle" | "converting" | "success" | "error";
@@ -163,7 +164,7 @@ export function Converter() {
 
   const convertToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
     const pdfDoc = await PDFDocument.create();
-    
+
     if (fileType === "jpg" || fileType === "png" || fileType === "gif" || fileType === "bmp" || fileType === "webp") {
       let image;
       if (fileType === 'jpg') image = await pdfDoc.embedJpg(arrayBuffer);
@@ -278,8 +279,9 @@ export function Converter() {
 
   const getFileIcon = () => {
     if (!file) return null;
-    if (fileType.startsWith('image/')) {
-      return <ImageIcon className="h-4 w-4" />;
+    const fileTypeStr = getFileTypeFromMime(file.type, getFileExtension(file.name));
+    if (['jpg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(fileTypeStr)) {
+        return <ImageIcon className="h-4 w-4" />;
     }
     return <FileText className="h-4 w-4" />;
   }
@@ -407,5 +409,3 @@ export function Converter() {
     </Card>
   );
 }
-
-    
