@@ -142,8 +142,12 @@ export function Converter() {
 
   const handleFileChange = (files: FileList | null) => {
     if (files && files.length > 0) {
-      resetState();
       const selectedFile = files[0];
+      if (!selectedFile) {
+        return;
+      }
+      resetState();
+      
       const extension = getFileExtension(selectedFile.name);
       const detectedType = getFileTypeFromMime(selectedFile.type, extension);
 
