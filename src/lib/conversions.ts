@@ -95,13 +95,13 @@ export const supportedConversions: Record<FileType, OutputFormat[]> = {
   // Audio
   mp3: ["wav"],
   wav: ["mp3"],
-  m4a: [], // Mocked conversions removed
-  ogg: [], // Mocked conversions removed
+  m4a: [],
+  ogg: [],
   // Video
-  mp4: ["gif"], // "mp3" extraction is possible but complex. "mov" is not.
-  mov: ["gif"], // "mp3" extraction is possible. "mp4" is not.
-  avi: [], // Cannot be processed reliably in-browser
-  webm: [], // Cannot be processed reliably in-browser
+  mp4: ["gif"],
+  mov: ["gif"],
+  avi: [],
+  webm: [],
   // Text-based
   html: ["pdf"],
   xml: ["pdf"],
@@ -256,7 +256,7 @@ const convertAudio = async(file: File, outputFormat: 'mp3' | 'wav', toast: (opti
     }
     
     // Fallback for any other requested formats
-    return mockApiCall(file, outputFormat, toast);
+    throw new Error(`Audio conversion to ${outputFormat} is not supported.`);
 }
 
 
@@ -330,8 +330,9 @@ const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<B
 const convertGifToVideo = (gifFile: File, outputFormat: 'mp4', toast: (options: any) => void): Promise<Blob> => {
     return new Promise(async (resolve, reject) => {
         toast({ description: "Browser-based GIF to Video conversion is not supported. This is a placeholder." });
-        const mockResult = await mockApiCall(gifFile, outputFormat, toast);
-        resolve(mockResult);
+        // This is a complex operation that usually requires a backend.
+        // For now, we will reject with an informative error.
+        reject(new Error(`Browser-based GIF to ${outputFormat} conversion is not supported.`));
     });
 };
 
@@ -343,8 +344,8 @@ const convertVideo = async(file: File, fileType: VideoFileType, outputFormat: Ou
     if (fileType === 'gif' && outputFormat === 'mp4') {
         return convertGifToVideo(file, outputFormat, toast);
     }
-    // In a real app, this would be an API call to a backend with FFMPEG for other formats
-    return mockApiCall(file, outputFormat, toast);
+    
+    throw new Error(`Video conversion from ${fileType} to ${outputFormat} is not supported.`);
 }
 
 const drawTextInPdf = async (pdfDoc: PDFDocument, textContent: string, useMonospace: boolean = false) => {
@@ -625,7 +626,7 @@ export const performConversion = async (file: File, fileType: FileType, outputFo
 
     if (audioOutputFormats.includes(outputFormat)) {
         blob = await convertAudio(file, outputFormat as 'mp3' | 'wav', toast);
-    } else if (['mp4', 'mov', 'avi', 'webm'].includes(fileType) && videoOutputFormats.includes(outputFormat)) {
+    } else if (['mp4', 'mov', 'avi', 'webm', 'gif'].includes(fileType) && videoOutputFormats.includes(outputFormat)) {
         blob = await convertVideo(file, fileType as VideoFileType, outputFormat, toast);
     }
     else if (fileType === 'pdf' && imageOutputFormats.includes(outputFormat)) {
