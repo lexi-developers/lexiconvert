@@ -38,6 +38,7 @@ import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import ePub from "epubjs";
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
+import { Potrace } from 'potrace';
 
 // === TYPES AND CONSTANTS ===
 
@@ -69,11 +70,11 @@ const supportedConversions: Record<FileType, OutputFormat[]> = {
   pptx: [], // Not supported
   txt: ["pdf"],
   epub: ["pdf"],
-  jpg: ["pdf", "png", "webp", "gif", "bmp"],
-  png: ["pdf", "jpg", "webp", "gif", "bmp"],
-  gif: ["pdf", "jpg", "png", "webp", "bmp"],
-  bmp: ["pdf", "jpg", "png", "webp", "gif"],
-  webp: ["pdf", "jpg", "png", "gif", "bmp"],
+  jpg: ["pdf", "png", "webp", "gif", "bmp", "svg"],
+  png: ["pdf", "jpg", "webp", "gif", "bmp", "svg"],
+  gif: ["pdf", "jpg", "png", "webp", "bmp", "svg"],
+  bmp: ["pdf", "jpg", "png", "webp", "gif", "svg"],
+  webp: ["pdf", "jpg", "png", "gif", "bmp", "svg"],
   svg: ["pdf", "png", "jpg"],
   unknown: [],
 };
@@ -97,6 +98,167 @@ const getFileTypeFromMime = (mime: string, extension: string): FileType => {
     return "unknown";
 }
 
+// === CONVERSION HELPERS ===
+
+const drawTextInPdf = async (pdfDoc: PDFDocument, textContent: string) => {
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontSize = 12;
+    const page = pdfDoc.addPage();
+    const { width, height } = page.getSize();
+    
+    page.drawText(textContent, {
+        x: 50, y: height - 4 * fontSize, font, size: fontSize, color: rgb(0, 0, 0), maxWidth: width - 100, lineHeight: 15
+    });
+}
+
+const convertEpubToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
+    const book = ePub(arrayBuffer);
+    const pdfDoc = await PDFDocument.create();
+    await book.ready;
+    const textContent = (await Promise.all(book.spine.items.map(async (item) => {
+        const doc = await item.load(book.load.bind(book));
+        const body = doc.querySelector('body');
+        if (body) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = body.innerHTML;
+            return tempDiv.innerText || '';
+        }
+        return '';
+    }))).join('\n\n');
+
+    await drawTextInPdf(pdfDoc, textContent);
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: "application/pdf" });
+};
+
+const convertDocxToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    const content = await zip.file("word/document.xml")?.async("string");
+    
+    let textContent = "無法讀取 DOCX 內容。這是一個實驗性功能。";
+    if (content) {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(content, "application/xml");
+        const paragraphs = xmlDoc.getElementsByTagName("w:p");
+        let text = [];
+        for (let i = 0; i < paragraphs.length; i++) {
+            text.push(Array.from(paragraphs[i].getElementsByTagName("w:t")).map(t => t.textContent).join(''));
+        }
+        textContent = text.join('\n');
+    }
+    
+    toast({ title: "DOCX 轉換限制", description: "僅提取純文字，所有樣式和圖片均會遺失。" });
+    const pdfDoc = await PDFDocument.create();
+    await drawTextInPdf(pdfDoc, textContent);
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: "application/pdf" });
+}
+
+const convertXlsxToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    const data = XLSX.utils.sheet_to_csv(worksheet);
+    
+    toast({ title: "XLSX 轉換限制", description: "僅轉換第一張工作表的數據為純文字，所有樣式、圖表和公式均會遺失。" });
+    const pdfDoc = await PDFDocument.create();
+    await drawTextInPdf(pdfDoc, data);
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: "application/pdf" });
+}
+
+const convertImageToPdf = async (fileType: FileType, arrayBuffer: ArrayBuffer): Promise<Blob> => {
+  const pdfDoc = await PDFDocument.create();
+  
+  if (fileType === "jpg" || fileType === "png" || fileType === "gif" || fileType === "bmp" || fileType === "webp") {
+    let image;
+    if (fileType === 'jpg') image = await pdfDoc.embedJpg(arrayBuffer);
+    else image = await pdfDoc.embedPng(await convertToPng(arrayBuffer, fileType)); // Convert others to PNG first
+    
+    const page = pdfDoc.addPage([image.width, image.height]);
+    page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+
+  } else if (fileType === "svg") {
+      const pngBlob = await convertImage(arrayBuffer, fileType, 'png');
+      const pngBuffer = await pngBlob.arrayBuffer();
+      const image = await pdfDoc.embedPng(pngBuffer);
+      const page = pdfDoc.addPage([image.width, image.height]);
+      page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+  }
+  
+  const pdfBytes = await pdfDoc.save();
+  return new Blob([pdfBytes], { type: "application/pdf" });
+}
+
+const convertTxtToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
+    const decoder = new TextDecoder("utf-8");
+    const textContent = decoder.decode(arrayBuffer);
+    const pdfDoc = await PDFDocument.create();
+    await drawTextInPdf(pdfDoc, textContent);
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: "application/pdf" });
+}
+
+const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targetFormat: Exclude<OutputFormat, 'pdf' | 'svg'>): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return reject(new Error('無法取得 Canvas context'));
+
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+      const targetMimeType = `image/${targetFormat}`;
+      canvas.toBlob((blob) => {
+        if (!blob) return reject(new Error('Canvas to Blob 轉換失敗'));
+        resolve(blob);
+      }, targetMimeType, 0.95);
+    };
+    img.onerror = () => reject(new Error('圖片載入失敗。檔案可能已損毀或格式不支援。'));
+
+    let srcUrl: string;
+    const sourceMime = Object.keys(mimeTypeToType).find(key => mimeTypeToType[key] === sourceType);
+    if (sourceType === 'svg') {
+      const decoder = new TextDecoder('utf-8');
+      const svgString = decoder.decode(arrayBuffer);
+      srcUrl = 'data:image/svg+xml;base64,' + btoa(svgString);
+    } else {
+      srcUrl = URL.createObjectURL(new Blob([arrayBuffer], { type: sourceMime }));
+    }
+    
+    img.src = srcUrl;
+    // Clean up the object URL
+    img.onloadend = () => {
+        if(srcUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(srcUrl);
+        }
+    }
+  });
+};
+
+const convertToPng = async (arrayBuffer: ArrayBuffer, sourceType: FileType): Promise<ArrayBuffer> => {
+  const blob = await convertImage(arrayBuffer, sourceType, 'png');
+  return blob.arrayBuffer();
+}
+
+const convertToSvg = (buffer: Buffer): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+        toast({ title: "圖片轉 SVG 限制", description: "此為實驗性功能，複雜圖片轉換效果可能不佳。" });
+        const potrace = new Potrace();
+        potrace.setParameters({
+            threshold: 128,
+            turdSize: 100,
+        });
+        potrace.loadImage(buffer, (err) => {
+            if (err) return reject(err);
+            const svg = potrace.getSVG();
+            resolve(new Blob([svg], { type: 'image/svg+xml' }));
+        });
+    });
+};
+
 // === REACT COMPONENT ===
 
 export function Converter() {
@@ -114,9 +276,9 @@ export function Converter() {
     if (!file || fileType === "unknown") return [];
     
     const extension = getFileExtension(file.name) as OutputFormat;
-    // Special case for svg, it can't be converted to itself
-    if (fileType === 'svg') {
-        return supportedConversions[fileType] || [];
+    // User can convert an SVG to an SVG, which makes no sense.
+    if (fileType === 'svg' && supportedConversions[fileType]) {
+        return supportedConversions[fileType].filter(f => f !== 'svg') || [];
     }
     return (supportedConversions[fileType] || []).filter(f => f !== extension);
     
@@ -185,145 +347,7 @@ export function Converter() {
       }
   };
 
-  // === CONVERSION LOGIC ===
-
-  const drawTextInPdf = async (pdfDoc: PDFDocument, textContent: string) => {
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const fontSize = 12;
-    const page = pdfDoc.addPage();
-    const { width, height } = page.getSize();
-    
-    page.drawText(textContent, {
-        x: 50, y: height - 4 * fontSize, font, size: fontSize, color: rgb(0, 0, 0), maxWidth: width - 100, lineHeight: 15
-    });
-  }
-  
-  const convertEpubToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
-    const book = ePub(arrayBuffer);
-    const pdfDoc = await PDFDocument.create();
-    await book.ready;
-    const textContent = (await Promise.all(book.spine.items.map(async (item) => {
-        const doc = await item.load(book.load.bind(book));
-        const body = doc.querySelector('body');
-        if (body) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = body.innerHTML;
-            return tempDiv.innerText || '';
-        }
-        return '';
-    }))).join('\n\n');
-
-    await drawTextInPdf(pdfDoc, textContent);
-    const pdfBytes = await pdfDoc.save();
-    return new Blob([pdfBytes], { type: "application/pdf" });
-  };
-
-  const convertDocxToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
-    const zip = await JSZip.loadAsync(arrayBuffer);
-    const content = await zip.file("word/document.xml")?.async("string");
-    
-    let textContent = "無法讀取 DOCX 內容。這是一個實驗性功能。";
-    if (content) {
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(content, "application/xml");
-        const paragraphs = xmlDoc.getElementsByTagName("w:p");
-        let text = [];
-        for (let i = 0; i < paragraphs.length; i++) {
-            text.push(Array.from(paragraphs[i].getElementsByTagName("w:t")).map(t => t.textContent).join(''));
-        }
-        textContent = text.join('\n');
-    }
-    
-    toast({ title: "DOCX 轉換限制", description: "僅提取純文字，所有樣式和圖片均會遺失。" });
-    const pdfDoc = await PDFDocument.create();
-    await drawTextInPdf(pdfDoc, textContent);
-    const pdfBytes = await pdfDoc.save();
-    return new Blob([pdfBytes], { type: "application/pdf" });
-  }
-
-  const convertXlsxToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    const firstSheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[firstSheetName];
-    const data = XLSX.utils.sheet_to_csv(worksheet);
-    
-    toast({ title: "XLSX 轉換限制", description: "僅轉換第一張工作表的數據為純文字，所有樣式、圖表和公式均會遺失。" });
-    const pdfDoc = await PDFDocument.create();
-    await drawTextInPdf(pdfDoc, data);
-    const pdfBytes = await pdfDoc.save();
-    return new Blob([pdfBytes], { type: "application/pdf" });
-  }
-
-
-  const convertToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
-    if (fileType === 'epub') return convertEpubToPdf(arrayBuffer);
-    if (fileType === 'docx') return convertDocxToPdf(arrayBuffer);
-    if (fileType === 'xlsx') return convertXlsxToPdf(arrayBuffer);
-    
-    const pdfDoc = await PDFDocument.create();
-
-    if (fileType === "jpg" || fileType === "png" || fileType === "gif" || fileType === "bmp" || fileType === "webp") {
-      let image;
-      if (fileType === 'jpg') image = await pdfDoc.embedJpg(arrayBuffer);
-      else image = await pdfDoc.embedPng(await convertToPng(arrayBuffer)); // Convert others to PNG first
-      
-      const page = pdfDoc.addPage([image.width, image.height]);
-      page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
-
-    } else if (fileType === "svg") {
-        const pngBlob = await convertImage(arrayBuffer, 'png');
-        const pngBuffer = await pngBlob.arrayBuffer();
-        const image = await pdfDoc.embedPng(pngBuffer);
-        const page = pdfDoc.addPage([image.width, image.height]);
-        page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
-
-    } else if (fileType === "txt") {
-        const decoder = new TextDecoder("utf-8");
-        const textContent = decoder.decode(arrayBuffer);
-        await drawTextInPdf(pdfDoc, textContent);
-    }
-
-    const pdfBytes = await pdfDoc.save();
-    return new Blob([pdfBytes], { type: "application/pdf" });
-  };
-  
-  const convertImage = async (arrayBuffer: ArrayBuffer, targetFormat: Exclude<OutputFormat, 'pdf' | 'svg'>): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return reject(new Error('無法取得 Canvas context'));
-
-      const img = new Image();
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-        const targetMimeType = `image/${targetFormat}`;
-        canvas.toBlob((blob) => {
-          if (!blob) return reject(new Error('Canvas to Blob 轉換失敗'));
-          resolve(blob);
-        }, targetMimeType, 0.95);
-      };
-      img.onerror = () => reject(new Error('圖片載入失敗。檔案可能已損毀或格式不支援。'));
-
-      let srcUrl: string;
-      if (fileType === 'svg') {
-        const decoder = new TextDecoder('utf-8');
-        const svgString = decoder.decode(arrayBuffer);
-        srcUrl = 'data:image/svg+xml;base64,' + btoa(svgString);
-      } else {
-        srcUrl = URL.createObjectURL(new Blob([arrayBuffer], { type: file?.type }));
-      }
-      
-      img.src = srcUrl;
-    });
-  };
-
-  const convertToPng = async (arrayBuffer: ArrayBuffer): Promise<ArrayBuffer> => {
-    const blob = await convertImage(arrayBuffer, 'png');
-    return blob.arrayBuffer();
-  }
-
+  // === MAIN CONVERSION LOGIC ===
   const handleConvert = async () => {
     if (!file || !outputFormat) return;
 
@@ -336,13 +360,23 @@ export function Converter() {
       let blob: Blob;
 
       if (outputFormat === 'pdf') {
-        blob = await convertToPdf(arrayBuffer);
+          switch(fileType) {
+              case 'epub': blob = await convertEpubToPdf(arrayBuffer); break;
+              case 'docx': blob = await convertDocxToPdf(arrayBuffer); break;
+              case 'xlsx': blob = await convertXlsxToPdf(arrayBuffer); break;
+              case 'txt': blob = await convertTxtToPdf(arrayBuffer); break;
+              default: blob = await convertImageToPdf(fileType, arrayBuffer); break;
+          }
       } else if (outputFormat === 'svg') {
-         // This path should not be taken as per current logic.
-         throw new Error("圖片轉 SVG 目前不支援。");
+          if (fileType === 'jpg' || fileType === 'png' || fileType === 'bmp' || fileType === 'gif' || fileType === 'webp') {
+              const buffer = Buffer.from(arrayBuffer);
+              blob = await convertToSvg(buffer);
+          } else {
+              throw new Error("僅支援圖片格式轉為 SVG。");
+          }
       }
       else {
-        blob = await convertImage(arrayBuffer, outputFormat);
+        blob = await convertImage(arrayBuffer, fileType, outputFormat);
       }
       
       const url = URL.createObjectURL(blob);
