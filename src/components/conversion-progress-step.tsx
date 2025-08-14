@@ -16,14 +16,12 @@ interface ConversionProgressStepProps {
 export function ConversionProgressStep({ tasks, onConversionComplete }: ConversionProgressStepProps) {
   const [results, setResults] = useState<ConversionResult[]>([]);
   const [progress, setProgress] = useState(0);
-  const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
     const processAllTasks = async () => {
       const newResults: ConversionResult[] = [];
       for (let i = 0; i < tasks.length; i++) {
-        setCurrentTaskIndex(i);
         const task = tasks[i];
         let result: ConversionResult;
         const startTime = Date.now();
@@ -62,8 +60,6 @@ export function ConversionProgressStep({ tasks, onConversionComplete }: Conversi
     processAllTasks();
   }, [tasks, onConversionComplete, toast]);
 
-  const currentTask = tasks[currentTaskIndex];
-
   return (
     <div className="space-y-8 flex flex-col items-center justify-center p-12 bg-muted/50 rounded-lg">
         <div className="flex items-center gap-4 text-2xl font-semibold">
@@ -71,12 +67,8 @@ export function ConversionProgressStep({ tasks, onConversionComplete }: Conversi
             <p>Converting files...</p>
         </div>
         
-        <div className="w-full max-w-lg space-y-4">
+        <div className="w-full max-w-lg">
             <Progress value={progress} />
-            <div className="text-center text-muted-foreground">
-                <p>Overall Progress: {Math.round(progress)}%</p>
-                {currentTask && <p>Processing: {currentTask.inputFile.name}</p>}
-            </div>
         </div>
     </div>
   );
