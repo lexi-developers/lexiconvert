@@ -1,3 +1,4 @@
+
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import ePub from "epubjs";
 import JSZip from 'jszip';
@@ -23,10 +24,10 @@ export const generateUniqueId = (filename: string) => {
 // === TYPES AND CONSTANTS ===
 
 export type DocumentFileType = "docx" | "txt" | "epub" | "xlsx" | "pptx" | "pdf";
-export type ImageFileType = "jpg" | "png" | "gif" | "bmp" | "webp" | "svg";
+export type ImageFileType = "jpg" | "png" | "gif" | "bmp" | "webp" | "svg" | "ico";
 export type TextBasedFileType = "html" | "xml" | "csv" | "json" | "md" | "js" | "ts" | "css" | "py" | "sql";
 export type FileType = DocumentFileType | ImageFileType | TextBasedFileType | "unknown";
-export type OutputFormat = "pdf" | "jpg" | "png" | "webp" | "gif" | "bmp" | "svg" | "zip";
+export type OutputFormat = "pdf" | "jpg" | "png" | "webp" | "gif" | "bmp" | "svg" | "zip" | "ico";
 
 export const mimeTypeToType: Record<string, FileType> = {
   // Documents
@@ -43,6 +44,8 @@ export const mimeTypeToType: Record<string, FileType> = {
   "image/bmp": "bmp",
   "image/webp": "webp",
   "image/svg+xml": "svg",
+  "image/x-icon": "ico",
+  "image/vnd.microsoft.icon": "ico",
   // Text-based & Code
   "text/html": "html",
   "text/xml": "xml",
@@ -68,12 +71,13 @@ export const supportedConversions: Record<FileType, OutputFormat[]> = {
   txt: ["pdf"],
   epub: ["pdf"],
   // Images
-  jpg: ["png", "pdf", "webp", "gif", "bmp", "svg"],
-  png: ["jpg", "pdf", "webp", "gif", "bmp", "svg"],
-  gif: ["png", "pdf", "jpg", "webp", "bmp"],
-  bmp: ["png", "pdf", "jpg", "webp", "gif", "svg"],
-  webp: ["png", "pdf", "jpg", "gif", "bmp", "svg"],
-  svg: ["png", "pdf", "jpg"],
+  jpg: ["png", "pdf", "webp", "gif", "bmp", "svg", "ico"],
+  png: ["jpg", "pdf", "webp", "gif", "bmp", "svg", "ico"],
+  gif: ["png", "pdf", "jpg", "webp", "bmp", "ico"],
+  bmp: ["png", "pdf", "jpg", "webp", "gif", "svg", "ico"],
+  webp: ["png", "pdf", "jpg", "gif", "bmp", "svg", "ico"],
+  svg: ["png", "pdf", "jpg", "ico"],
+  ico: ["png", "jpg", "webp", "bmp", "gif", "pdf"],
   // Text-based
   html: ["pdf"],
   xml: ["pdf"],
@@ -104,7 +108,7 @@ export const getFileTypeFromMime = (mime: string, extension: string): FileType =
         'pptx': 'pptx', 'svg': 'svg', 'html': 'html', 'htm': 'html',
         'xml': 'xml', 'csv': 'csv', 'json': 'json', 'md': 'md', 'js': 'js',
         'ts': 'ts', 'css': 'css', 'py': 'py', 'sql': 'sql', 'txt': 'txt',
-        'pdf': 'pdf',
+        'pdf': 'pdf', 'ico': 'ico',
     };
     if (extMap[extension]) return extMap[extension];
     return "unknown";
@@ -200,7 +204,7 @@ const convertXlsxToPdf = async (arrayBuffer: ArrayBuffer, toast: (options: { tit
 const convertImageToPdf = async (fileType: FileType, arrayBuffer: ArrayBuffer): Promise<Blob> => {
   const pdfDoc = await PDFDocument.create();
   
-  if (fileType === "jpg" || fileType === "png" || fileType === "gif" || fileType === "bmp" || fileType === "webp") {
+  if (fileType === "jpg" || fileType === "png" || fileType === "gif" || fileType === "bmp" || fileType === "webp" || fileType === "ico") {
     let image;
     if (fileType === 'jpg') image = await pdfDoc.embedJpg(arrayBuffer);
     else image = await pdfDoc.embedPng(await convertToPng(arrayBuffer, fileType)); // Convert others to PNG first
@@ -272,7 +276,7 @@ const convertPdfToImages = async (
     }
 };
 
-const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targetFormat: Exclude<OutputFormat, 'pdf' | 'svg' | 'zip'>): Promise<Blob> => {
+const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targetFormat: Exclude<OutputFormat, 'pdf' | 'svg' | 'zip' | 'ico'>): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -292,7 +296,8 @@ const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targ
     img.onerror = () => reject(new Error('Image failed to load. The file may be corrupt or in an unsupported format.'));
 
     let srcUrl: string;
-    const sourceMime = Object.keys(mimeTypeToType).find(key => mimeTypeToType[key] === sourceType);
+    const sourceMime = Object.keys(mimeTypeToType).find(key => mimeTypeToType[key] === sourceType) || `image/${sourceType}`;
+    
     if (sourceType === 'svg') {
       const decoder = new TextDecoder('utf-8');
       const svgString = decoder.decode(arrayBuffer);
@@ -310,6 +315,53 @@ const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targ
     }
   });
 };
+
+const convertImageToIco = async (arrayBuffer: ArrayBuffer, sourceType: FileType): Promise<Blob> => {
+    // 1. Load the source image
+    const sourceBlob = new Blob([arrayBuffer], { type: `image/${sourceType}` });
+    const imageBitmap = await createImageBitmap(sourceBlob);
+
+    // 2. Resize to 32x32 on a canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error("Could not create canvas context");
+    ctx.drawImage(imageBitmap, 0, 0, 32, 32);
+
+    // 3. Get the PNG data from the canvas
+    const pngDataUrl = canvas.toDataURL('image/png');
+    const pngBuffer = await (await fetch(pngDataUrl)).arrayBuffer();
+    const pngView = new DataView(pngBuffer);
+
+    // 4. Manually construct the ICO file
+    // ICO header (6 bytes) + ICONDIRENTRY (16 bytes) + PNG data
+    const icoBuffer = new ArrayBuffer(6 + 16 + pngBuffer.byteLength);
+    const icoView = new DataView(icoBuffer);
+
+    // ICONDIR header
+    icoView.setUint16(0, 0, true); // Reserved, must be 0
+    icoView.setUint16(2, 1, true); // Type: 1 for icon
+    icoView.setUint16(4, 1, true); // Number of images
+
+    // ICONDIRENTRY
+    icoView.setUint8(6, 32); // Width (32px)
+    icoView.setUint8(7, 32); // Height (32px)
+    icoView.setUint8(8, 0);  // Color count (0 for > 256)
+    icoView.setUint8(9, 0);  // Reserved, should be 0
+    icoView.setUint16(10, 1, true); // Color planes
+    icoView.setUint16(12, 32, true); // Bits per pixel
+    icoView.setUint32(14, pngBuffer.byteLength, true); // Size of image data
+    icoView.setUint32(18, 22, true); // Offset of image data (6+16)
+
+    // Copy PNG data
+    const icoBytes = new Uint8Array(icoBuffer);
+    const pngBytes = new Uint8Array(pngBuffer);
+    icoBytes.set(pngBytes, 22);
+
+    return new Blob([icoBuffer], { type: 'image/vnd.microsoft.icon' });
+};
+
 
 const convertToPng = async (arrayBuffer: ArrayBuffer, sourceType: FileType): Promise<ArrayBuffer> => {
   const blob = await convertImage(arrayBuffer, sourceType, 'png');
@@ -371,9 +423,15 @@ export const performConversion = async (file: File, fileType: FileType, outputFo
         } else {
             throw new Error("Only image formats can be converted to SVG.");
         }
+    } else if (outputFormat === 'ico') {
+        if (fileType === 'png' || fileType === 'jpg' || fileType === 'webp' || fileType === 'bmp' || fileType === 'gif' || fileType === 'svg') {
+            blob = await convertImageToIco(arrayBuffer, fileType);
+        } else {
+            throw new Error(`Conversion from ${fileType} to ICO is not supported.`);
+        }
     }
     else {
-      blob = await convertImage(arrayBuffer, fileType, outputFormat as Exclude<OutputFormat, 'pdf' | 'svg' | 'zip'>);
+      blob = await convertImage(arrayBuffer, fileType, outputFormat as Exclude<OutputFormat, 'pdf' | 'svg' | 'zip' | 'ico'>);
     }
     return { blob, finalOutputFormat };
 }

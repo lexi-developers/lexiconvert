@@ -1,3 +1,4 @@
+
 import {
   FileText,
   ImageIcon,
@@ -16,7 +17,7 @@ export const getFileIcon = (filename: string, filetype: string) => {
     const extension = getFileExtension(filename);
     const type = getFileTypeFromMime(filetype, extension);
     
-    if (['jpg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(type)) {
+    if (['jpg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico'].includes(type)) {
         return <ImageIcon className="h-full w-full" />;
     }
     if (type === 'epub') return <Book className="h-full w-full" />;
