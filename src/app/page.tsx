@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, FileUp } from "lucide-react";
+import { Plus, FileUp, Settings as SettingsIcon, Loader2 } from "lucide-react";
 import { FileHistory } from "@/components/file-history";
 import { ConversionFlow } from "@/components/conversion-flow";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { getAllConversions, deleteConversion } from "@/lib/db";
+import { getAllConversions } from "@/lib/db";
+import { useLocalStorage } from "@/hooks/use-local-storage";
+import { OnboardingDialog } from "@/components/settings/onboarding-dialog";
+import { SettingsDialog } from "@/components/settings/settings-dialog";
+import { LockScreen } from "@/components/settings/lock-screen";
 
 
 export type ConversionResult = {
@@ -29,45 +33,65 @@ export type ConversionResult = {
 export default function Home() {
   const [history, setHistory] = useState<ConversionResult[]>([]);
   const [isConversionFlowOpen, setIsConversionFlowOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  
+  const [hasOnboarded, setHasOnboarded] = useLocalStorage("hasOnboarded", false);
+  const [isClient, setIsClient] = useState(false)
+  const [password] = useLocalStorage<string | null>('app-password', null);
+  const [isUnlocked, setIsUnlocked] = useState(!password);
+
 
   useEffect(() => {
-    const loadHistory = async () => {
-      setIsLoading(true);
-      const storedConversions = await getAllConversions();
-      setHistory(storedConversions.sort((a, b) => parseInt(b.id.split('-')[1]) - parseInt(a.id.split('-')[1])));
-      setIsLoading(false);
-    };
-    loadHistory();
-  }, []);
-
-  const handleFlowDone = (results: ConversionResult[] = []) => {
-    if (results.length > 0) {
-      // Since results are now saved to DB within the flow, we just need to re-read
-       const loadHistory = async () => {
+    setIsClient(true)
+    if (isUnlocked) {
+      const loadHistory = async () => {
+        setIsLoading(true);
         const storedConversions = await getAllConversions();
         setHistory(storedConversions.sort((a, b) => parseInt(b.id.split('-')[1]) - parseInt(a.id.split('-')[1])));
+        setIsLoading(false);
       };
       loadHistory();
+    }
+  }, [isUnlocked]);
+  
+  const refreshHistory = async () => {
+    setIsLoading(true);
+    const storedConversions = await getAllConversions();
+    setHistory(storedConversions.sort((a, b) => parseInt(b.id.split('-')[1]) - parseInt(a.id.split('-')[1])));
+    setIsLoading(false);
+  };
+
+
+  const handleFlowDone = (results: ConversionResult[] = []) => {
+    if (results.length >= 0) {
+      refreshHistory();
     }
     setIsConversionFlowOpen(false);
   }
 
-  const handleSetHistory = (newHistory: ConversionResult[] | ((prev: ConversionResult[]) => ConversionResult[])) => {
-    if (typeof newHistory === 'function') {
-      setHistory(prev => {
-        const updated = newHistory(prev);
-        // This is tricky to sync with DB. For now, deletions are handled separately.
-        return updated;
-      });
-    } else {
-      setHistory(newHistory);
-    }
+  const handleOnboardingComplete = () => {
+    setHasOnboarded(true);
+  }
+  
+  const handleDeleteFromHistory = async () => {
+    await refreshHistory();
+  }
+  
+  if (!isClient) {
+    return (
+        <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-background">
+            <Loader2 className="h-16 w-16 animate-spin" />
+        </div>
+    );
+  }
+  
+  if (!isUnlocked) {
+    return <LockScreen onUnlock={() => setIsUnlocked(true)} />;
   }
 
-  const handleDeleteFromHistory = (ids: string | string[]) => {
-    const idsToDelete = Array.isArray(ids) ? ids : [ids];
-    setHistory(prev => prev.filter(item => !idsToDelete.includes(item.id)));
+  if (!hasOnboarded) {
+    return <OnboardingDialog onComplete={handleOnboardingComplete} />;
   }
 
 
@@ -80,19 +104,34 @@ export default function Home() {
               LexiConvert
             </h1>
           </div>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="icon" variant="outline" className="rounded-full" onClick={() => setIsConversionFlowOpen(true)}>
-                  <Plus className="h-5 w-5" />
-                  <span className="sr-only">New Conversion</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>New Conversion</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <div className="flex items-center gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon" variant="outline" className="rounded-full" onClick={() => setIsConversionFlowOpen(true)}>
+                    <Plus className="h-5 w-5" />
+                    <span className="sr-only">New Conversion</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>New Conversion</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+             <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                   <Button size="icon" variant="outline" className="rounded-full" onClick={() => setIsSettingsOpen(true)}>
+                      <SettingsIcon className="h-5 w-5" />
+                      <span className="sr-only">Settings</span>
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Settings</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </header>
 
         {isLoading ? (
@@ -100,7 +139,7 @@ export default function Home() {
               <p>Loading history...</p>
             </div>
         ) : history.length > 0 ? (
-          <FileHistory history={history} setHistory={handleSetHistory} onDelete={handleDeleteFromHistory} />
+          <FileHistory history={history} setHistory={setHistory} onDelete={handleDeleteFromHistory} />
         ) : (
           <div className="flex items-center justify-center h-[60vh]">
             <div className="text-center p-8 border border-dashed rounded-lg">
@@ -109,7 +148,7 @@ export default function Home() {
                 </div>
                 <h3 className="mt-4 text-lg font-medium">No conversions yet</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                    Click the button below to start your first file conversion.
+                    It will not be uploaded to our server.
                 </p>
                 <div className="mt-6">
                     <Button onClick={() => setIsConversionFlowOpen(true)}>
@@ -129,6 +168,9 @@ export default function Home() {
           />
         </DialogContent>
        </Dialog>
+       
+       <SettingsDialog isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} onHistoryCleared={refreshHistory} />
     </main>
   );
 }
+
