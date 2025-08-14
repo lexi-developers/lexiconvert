@@ -100,7 +100,7 @@ const supportedConversions: Record<FileType, OutputFormat[]> = {
   docx: ["pdf"],
   xlsx: ["pdf"],
   pptx: [],
-  pdf: ["png", "jpg"],
+  pdf: ["png", "jpg", "webp", "bmp"],
   txt: ["pdf"],
   epub: ["pdf"],
   // Images
@@ -255,7 +255,11 @@ const convertImageToPdf = async (fileType: FileType, arrayBuffer: ArrayBuffer): 
   return new Blob([pdfBytes], { type: "application/pdf" });
 }
 
-const convertPdfToImages = async (arrayBuffer: ArrayBuffer, outputFormat: 'png' | 'jpg', toast: (options: any) => void): Promise<Blob> => {
+const convertPdfToImages = async (
+  arrayBuffer: ArrayBuffer, 
+  outputFormat: 'png' | 'jpg' | 'webp' | 'bmp', 
+  toast: (options: any) => void
+): Promise<{blob: Blob, isZip: boolean}> => {
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
     const pdf = await loadingTask.promise;
     const numPages = pdf.numPages;
@@ -265,34 +269,42 @@ const convertPdfToImages = async (arrayBuffer: ArrayBuffer, outputFormat: 'png' 
     }
 
     toast({ title: "開始轉換 PDF", description: `正在將 ${numPages} 個頁面轉換為 ${outputFormat.toUpperCase()} 圖片...` });
-
-    const zip = new JSZip();
+    
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error("無法建立 Canvas Context");
-
-    for (let i = 1; i <= numPages; i++) {
-        const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 2.0 }); // Use higher scale for better quality
+    
+    const renderPage = async (pageNumber: number): Promise<Blob> => {
+        const page = await pdf.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: 2.0 });
         canvas.height = viewport.height;
         canvas.width = viewport.width;
 
-        const renderContext = {
-            canvasContext: ctx,
-            viewport: viewport
-        };
+        const renderContext = { canvasContext: ctx, viewport: viewport };
         await page.render(renderContext).promise;
 
-        const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, `image/${outputFormat}`, 0.95));
-        if (blob) {
+        const mimeType = `image/${outputFormat === 'jpg' ? 'jpeg' : outputFormat}`;
+        const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, mimeType, 0.95));
+        if (!blob) throw new Error(`無法將頁面 ${pageNumber} 轉換為圖片`);
+        page.cleanup();
+        return blob;
+    };
+
+    if (numPages === 1) {
+        const blob = await renderPage(1);
+        canvas.remove();
+        return { blob, isZip: false };
+    } else {
+        const zip = new JSZip();
+        for (let i = 1; i <= numPages; i++) {
+            const blob = await renderPage(i);
             zip.file(`page_${i}.${outputFormat}`, blob);
         }
-        page.cleanup();
+        canvas.remove();
+        toast({ title: "壓縮中...", description: "正在將所有圖片壓縮成 ZIP 檔案。" });
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        return { blob: zipBlob, isZip: true };
     }
-    canvas.remove();
-
-    toast({ title: "壓縮中...", description: "正在將所有圖片壓縮成 ZIP 檔案。" });
-    return await zip.generateAsync({ type: "blob" });
 };
 
 const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targetFormat: Exclude<OutputFormat, 'pdf' | 'svg' | 'zip'>): Promise<Blob> => {
@@ -306,7 +318,7 @@ const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targ
       canvas.width = img.width;
       canvas.height = img.height;
       ctx.drawImage(img, 0, 0);
-      const targetMimeType = `image/${targetFormat}`;
+      const targetMimeType = `image/${targetFormat === 'jpg' ? 'jpeg' : targetFormat}`;
       canvas.toBlob((blob) => {
         if (!blob) return reject(new Error('Canvas to Blob 轉換失敗'));
         resolve(blob);
@@ -433,8 +445,9 @@ export function Converter() {
     setFileType(detectedType);
     
     let possibleFormats = (supportedConversions[detectedType] || []);
-    if (detectedType !== 'pdf') {
-        possibleFormats = possibleFormats.filter(f => f !== extension);
+    if (detectedType !== 'pdf' && detectedType !== 'svg') {
+        const currentExtension = getFileExtension(selectedFile.name) as OutputFormat;
+        possibleFormats = possibleFormats.filter(f => f !== currentExtension);
     }
     
     if (possibleFormats.length > 0) {
@@ -469,9 +482,13 @@ export function Converter() {
       let blob: Blob;
       let finalOutputFormat = outputFormat;
 
-      if (fileType === 'pdf' && (outputFormat === 'png' || outputFormat === 'jpg')) {
-          blob = await convertPdfToImages(arrayBuffer, outputFormat, toast);
-          finalOutputFormat = 'zip';
+      const imageOutputFormats = ["png", "jpg", "webp", "bmp"];
+      if (fileType === 'pdf' && imageOutputFormats.includes(outputFormat)) {
+          const result = await convertPdfToImages(arrayBuffer, outputFormat as 'png' | 'jpg' | 'webp' | 'bmp', toast);
+          blob = result.blob;
+          if (result.isZip) {
+              finalOutputFormat = 'zip';
+          }
       } else if (outputFormat === 'pdf') {
           switch(fileType) {
               case 'epub': blob = await convertEpubToPdf(arrayBuffer, toast); break;
@@ -528,10 +545,9 @@ export function Converter() {
   // === UI RENDERING ===
 
   const getOutputFilename = () => {
-    if (!file || !outputFormat) return "converted.file";
+    if (!file || !convertedFileType) return "converted.file";
     const nameWithoutExtension = file.name.split('.').slice(0, -1).join('.');
-    const finalExtension = (fileType === 'pdf' && (outputFormat === 'png' || outputFormat === 'jpg')) ? 'zip' : outputFormat;
-    return `${nameWithoutExtension || 'converted'}.${finalExtension}`;
+    return `${nameWithoutExtension || 'converted'}.${convertedFileType}`;
   }
 
   const getFileIcon = () => {
@@ -562,9 +578,6 @@ export function Converter() {
   }, []);
 
   const getSelectLabel = (format: OutputFormat) => {
-    if (fileType === 'pdf' && (format === 'png' || format === 'jpg')) {
-        return `${format.toUpperCase()} (as .ZIP)`;
-    }
     return format.toUpperCase();
   }
 
