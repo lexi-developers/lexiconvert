@@ -16,6 +16,10 @@ import {
   Book,
   FileSpreadsheet,
   FileX,
+  FileCode,
+  Database,
+  Braces,
+  FileJson,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -46,7 +50,8 @@ import { Potrace } from 'potrace';
 type ConversionStatus = "idle" | "converting" | "success" | "error";
 type DocumentFileType = "docx" | "txt" | "epub" | "xlsx" | "pptx";
 type ImageFileType = "jpg" | "png" | "gif" | "bmp" | "webp" | "svg";
-type FileType = DocumentFileType | ImageFileType | "unknown";
+type TextBasedFileType = "html" | "xml" | "csv" | "json" | "md" | "js" | "ts" | "css" | "py" | "sql";
+type FileType = DocumentFileType | ImageFileType | TextBasedFileType | "unknown";
 type OutputFormat = "pdf" | "jpg" | "png" | "webp" | "gif" | "bmp" | "svg";
 
 const mimeTypeToType: Record<string, FileType> = {
@@ -63,20 +68,48 @@ const mimeTypeToType: Record<string, FileType> = {
   "image/bmp": "bmp",
   "image/webp": "webp",
   "image/svg+xml": "svg",
+  // Text-based & Code
+  "text/html": "html",
+  "text/xml": "xml",
+  "application/xml": "xml",
+  "text/csv": "csv",
+  "application/json": "json",
+  "text/markdown": "md",
+  "application/javascript": "js",
+  "text/javascript": "js",
+  "application/x-typescript": "ts",
+  "text/typescript": "ts",
+  "text/css": "css",
+  "text/x-python": "py",
+  "application/sql": "sql",
 };
 
 const supportedConversions: Record<FileType, OutputFormat[]> = {
+  // Documents
   docx: ["pdf"],
   xlsx: ["pdf"],
-  pptx: [], // Not supported
+  pptx: [], 
   txt: ["pdf"],
   epub: ["pdf"],
+  // Images
   jpg: ["pdf", "png", "webp", "gif", "bmp", "svg"],
   png: ["pdf", "jpg", "webp", "gif", "bmp", "svg"],
   gif: ["pdf", "jpg", "png", "webp", "bmp"],
   bmp: ["pdf", "jpg", "png", "webp", "gif", "svg"],
   webp: ["pdf", "jpg", "png", "gif", "bmp", "svg"],
   svg: ["pdf", "png", "jpg"],
+  // Text-based
+  html: ["pdf"],
+  xml: ["pdf"],
+  csv: ["pdf"],
+  json: ["pdf"],
+  md: ["pdf"],
+  js: ["pdf"],
+  ts: ["pdf"],
+  css: ["pdf"],
+  py: ["pdf"],
+  sql: ["pdf"],
+  // Unknown
   unknown: [],
 };
 
@@ -89,30 +122,45 @@ const getFileExtension = (filename: string): string => {
 const getFileTypeFromMime = (mime: string, extension: string): FileType => {
     if (mime in mimeTypeToType) return mimeTypeToType[mime];
     // Fallback for types not correctly reported by browser
-    if (extension === 'jpg' || extension === 'jpeg') return 'jpg';
-    if (extension === 'png') return 'png';
-    if (extension === 'gif') return 'gif';
-    if (extension === 'bmp') return 'bmp';
-    if (extension === 'webp') return 'webp';
-    if (extension === 'epub') return 'epub';
-    if (extension === 'docx') return 'docx';
-    if (extension === 'xlsx') return 'xlsx';
-    if (extension === 'pptx') return 'pptx';
-    if (extension === 'svg') return 'svg';
+    const extMap: { [key: string]: FileType } = {
+        'jpg': 'jpg', 'jpeg': 'jpg', 'png': 'png', 'gif': 'gif', 'bmp': 'bmp',
+        'webp': 'webp', 'epub': 'epub', 'docx': 'docx', 'xlsx': 'xlsx',
+        'pptx': 'pptx', 'svg': 'svg', 'html': 'html', 'htm': 'html',
+        'xml': 'xml', 'csv': 'csv', 'json': 'json', 'md': 'md', 'js': 'js',
+        'ts': 'ts', 'css': 'css', 'py': 'py', 'sql': 'sql', 'txt': 'txt'
+    };
+    if (extMap[extension]) return extMap[extension];
     return "unknown";
 }
 
 // === CONVERSION HELPERS ===
 
-const drawTextInPdf = async (pdfDoc: PDFDocument, textContent: string) => {
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const fontSize = 12;
+const drawTextInPdf = async (pdfDoc: PDFDocument, textContent: string, useMonospace: boolean = false) => {
+    const font = await pdfDoc.embedFont(useMonospace ? StandardFonts.Courier : StandardFonts.Helvetica);
+    const fontSize = 10;
     const page = pdfDoc.addPage();
     const { width, height } = page.getSize();
     
     page.drawText(textContent, {
-        x: 50, y: height - 4 * fontSize, font, size: fontSize, color: rgb(0, 0, 0), maxWidth: width - 100, lineHeight: 15
+        x: 40, y: height - 4 * fontSize, font, size: fontSize, color: rgb(0, 0, 0), maxWidth: width - 80, lineHeight: 14
     });
+}
+
+const convertTextBasedToPdf = async (arrayBuffer: ArrayBuffer, isCode: boolean = false, isJson: boolean = false): Promise<Blob> => {
+    const decoder = new TextDecoder("utf-8");
+    let textContent = decoder.decode(arrayBuffer);
+    if(isJson) {
+        try {
+            textContent = JSON.stringify(JSON.parse(textContent), null, 2);
+        } catch (e) {
+            // Not a valid JSON, just use the raw text
+        }
+    }
+
+    const pdfDoc = await PDFDocument.create();
+    await drawTextInPdf(pdfDoc, textContent, isCode || isJson);
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: "application/pdf" });
 }
 
 const convertEpubToPdf = async (arrayBuffer: ArrayBuffer, toast: (options: { title: string; description: string; }) => void): Promise<Blob> => {
@@ -192,15 +240,6 @@ const convertImageToPdf = async (fileType: FileType, arrayBuffer: ArrayBuffer): 
   
   const pdfBytes = await pdfDoc.save();
   return new Blob([pdfBytes], { type: "application/pdf" });
-}
-
-const convertTxtToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
-    const decoder = new TextDecoder("utf-8");
-    const textContent = decoder.decode(arrayBuffer);
-    const pdfDoc = await PDFDocument.create();
-    await drawTextInPdf(pdfDoc, textContent);
-    const pdfBytes = await pdfDoc.save();
-    return new Blob([pdfBytes], { type: "application/pdf" });
 }
 
 const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targetFormat: Exclude<OutputFormat, 'pdf' | 'svg'>): Promise<Blob> => {
@@ -364,12 +403,25 @@ export function Converter() {
       const arrayBuffer = await file.arrayBuffer();
       let blob: Blob;
 
+      const codeFileTypes: FileType[] = ['js', 'ts', 'css', 'py', 'sql', 'xml', 'html', 'md'];
+
       if (outputFormat === 'pdf') {
           switch(fileType) {
               case 'epub': blob = await convertEpubToPdf(arrayBuffer, toast); break;
               case 'docx': blob = await convertDocxToPdf(arrayBuffer, toast); break;
               case 'xlsx': blob = await convertXlsxToPdf(arrayBuffer, toast); break;
-              case 'txt': blob = await convertTxtToPdf(arrayBuffer); break;
+              case 'csv': // Fallthrough
+              case 'txt': blob = await convertTextBasedToPdf(arrayBuffer); break;
+              case 'json': blob = await convertTextBasedToPdf(arrayBuffer, true, true); break;
+              case 'js':
+              case 'ts':
+              case 'css':
+              case 'py':
+              case 'sql':
+              case 'xml':
+              case 'html':
+              case 'md':
+                blob = await convertTextBasedToPdf(arrayBuffer, true, false); break;
               default: blob = await convertImageToPdf(fileType, arrayBuffer); break;
           }
       } else if (outputFormat === 'svg') {
@@ -416,23 +468,28 @@ export function Converter() {
   const getFileIcon = () => {
     if (!file) return null;
     const fileTypeStr = getFileTypeFromMime(file.type, getFileExtension(file.name));
+    
     if (['jpg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(fileTypeStr)) {
         return <ImageIcon className="h-4 w-4" />;
     }
-    if (fileTypeStr === 'epub') {
-        return <Book className="h-4 w-4" />;
+    if (fileTypeStr === 'epub') return <Book className="h-4 w-4" />;
+    if (fileTypeStr === 'xlsx') return <FileSpreadsheet className="h-4 w-4" />;
+    if (fileTypeStr === 'pptx') return <FileX className="h-4 w-4 text-destructive" />;
+    if (fileTypeStr === 'csv' || fileTypeStr === 'sql') return <Database className="h-4 w-4" />;
+    if (fileTypeStr === 'json') return <FileJson className="h-4 w-4" />;
+    if (fileTypeStr === 'xml' || fileTypeStr === 'html') return <Braces className="h-4 w-4" />;
+    if (['js', 'ts', 'css', 'py', 'md'].includes(fileTypeStr)) {
+        return <FileCode className="h-4 w-4" />;
     }
-    if (fileTypeStr === 'xlsx') {
-        return <FileSpreadsheet className="h-4 w-4" />;
-    }
-    if (fileTypeStr === 'pptx') {
-        return <FileX className="h-4 w-4 text-destructive" />;
-    }
+    
     return <FileText className="h-4 w-4" />;
   }
   
   const acceptedFileTypes = useMemo(() => {
-    return Object.keys(mimeTypeToType).join(',');
+    const extensions = Object.keys(mimeTypeToType).concat(
+      '.md', '.py', '.sql', '.htm', '.jpeg', '.ts' // Add extensions that might not have a unique mime type
+    );
+    return extensions.join(',');
   }, []);
 
   return (
@@ -460,7 +517,7 @@ export function Converter() {
             <p className="mt-4 text-center text-muted-foreground">
               <span className="font-semibold text-primary">點擊上傳</span> 或拖放檔案
             </p>
-            <p className="text-xs text-muted-foreground mt-1">支援 DOCX, XLSX, TXT, EPUB, JPG, PNG, GIF, BMP, WebP, SVG 等格式</p>
+            <p className="text-xs text-muted-foreground mt-1">支援 DOCX, XLSX, TXT, EPUB, 圖片, 程式碼等多種格式</p>
             <input
               ref={fileInputRef}
               type="file"
@@ -554,5 +611,3 @@ export function Converter() {
     </Card>
   );
 }
-
-    
