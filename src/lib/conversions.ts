@@ -30,7 +30,7 @@ export type AudioFileType = "mp3" | "wav" | "m4a" | "ogg";
 export type VideoFileType = "mp4" | "mov" | "avi" | "webm";
 export type TextBasedFileType = "html" | "xml" | "csv" | "json" | "md" | "js" | "ts" | "css" | "py" | "sql";
 export type FileType = DocumentFileType | ImageFileType | AudioFileType | VideoFileType | TextBasedFileType | "unknown";
-export type OutputFormat = "pdf" | "jpg" | "png" | "webp" | "gif" | "bmp" | "svg" | "zip" | "ico" | "mp3" | "wav" | "mp4";
+export type OutputFormat = "pdf" | "jpg" | "png" | "webp" | "gif" | "bmp" | "svg" | "zip" | "ico" | "mp3" | "wav" | "mp4" | "mov";
 
 export const mimeTypeToType: Record<string, FileType> = {
   // Documents
@@ -87,7 +87,7 @@ export const supportedConversions: Record<FileType, OutputFormat[]> = {
   // Images
   jpg: ["png", "pdf", "webp", "gif", "bmp", "svg", "ico"],
   png: ["jpg", "pdf", "webp", "gif", "bmp", "svg", "ico"],
-  gif: ["png", "pdf", "jpg", "webp", "bmp", "ico", "mp4"],
+  gif: ["png", "pdf", "jpg", "webp", "bmp", "ico", "mp4"], // Added MP4
   bmp: ["png", "pdf", "jpg", "webp", "gif", "svg", "ico"],
   webp: ["png", "pdf", "jpg", "gif", "bmp", "svg", "ico"],
   svg: ["png", "pdf", "jpg", "ico"],
@@ -98,8 +98,8 @@ export const supportedConversions: Record<FileType, OutputFormat[]> = {
   m4a: ["mp3", "wav"],
   ogg: ["mp3", "wav"],
   // Video
-  mp4: ["gif", "mp3"],
-  mov: ["mp4", "gif", "mp3"],
+  mp4: ["gif", "mp3", "mov"], // Added MOV (mock)
+  mov: ["mp4", "gif", "mp3"], // Added MP4 (mock) and GIF
   avi: ["mp4", "gif", "mp3"],
   webm: ["mp4", "gif", "mp3"],
   // Text-based
@@ -146,12 +146,17 @@ export const getFileTypeFromMime = (mime: string, extension: string): FileType =
 const mockApiCall = (file: File, outputFormat: string, toast: (options:any) => void): Promise<Blob> => {
     return new Promise((resolve, reject) => {
         toast({
-            description: `This is a placeholder. In a real app, '${file.name}' would be uploaded and converted to ${outputFormat} on a server.`
+            description: `This is a placeholder. In a real app, '${file.name}' would be uploaded and converted to ${outputFormat.toUpperCase()} on a server.`
         });
         setTimeout(() => {
             // Simulate a successful conversion by creating a dummy file
-            const dummyContent = `This is a mock converted ${outputFormat} file from ${file.name}.`;
-            const mimeType = outputFormat === 'mp3' ? 'audio/mpeg' : `video/${outputFormat}`;
+            const dummyContent = `This is a mock converted ${outputFormat.toUpperCase()} file from ${file.name}.`;
+            let mimeType = 'application/octet-stream';
+            if (['mp4', 'mov'].includes(outputFormat)) {
+                mimeType = `video/${outputFormat}`;
+            } else if (outputFormat === 'mp3') {
+                mimeType = 'audio/mpeg';
+            }
             const blob = new Blob([dummyContent], { type: mimeType });
             resolve(blob);
         }, 3000);
@@ -164,8 +169,11 @@ const convertAudio = async(file: File, outputFormat: 'mp3' | 'wav', toast: (opti
 }
 
 const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         toast({ description: "Starting video to GIF conversion. This may be slow and consume significant memory." });
+        
+        // Dynamically import gif.js
+        const { default: GIF } = await import('gif.js');
 
         const videoUrl = URL.createObjectURL(file);
         const video = document.createElement('video');
@@ -175,18 +183,17 @@ const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<B
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) {
+            URL.revokeObjectURL(videoUrl);
             return reject(new Error("Could not create canvas context."));
         }
 
-        video.onloadedmetadata = async () => {
+        video.onloadedmetadata = () => {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             const duration = video.duration;
             const frameRate = 10; // Capture 10 frames per second
             const frameDelay = 1000 / frameRate; // Delay in ms
 
-            // We will use a dynamic library for GIF encoding
-            const { default: GIF } = await import('gif.js');
             const gif = new GIF({
                 workers: 2,
                 quality: 10,
@@ -194,10 +201,12 @@ const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<B
             });
 
             video.currentTime = 0;
+            let framesAdded = 0;
 
             video.onseeked = () => {
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 gif.addFrame(ctx, { copy: true, delay: frameDelay });
+                framesAdded++;
 
                 if (video.currentTime < duration) {
                     video.currentTime += 1 / frameRate;
@@ -214,18 +223,66 @@ const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<B
             };
 
             // Start the process
-            video.currentTime = 0;
+            video.onseeked(new Event('seeked'));
         };
 
         video.onerror = (e) => {
             URL.revokeObjectURL(videoUrl);
-            reject(new Error("Failed to load video file."));
+            reject(new Error("Failed to load video file. It might be in a format your browser doesn't support."));
+        };
+    });
+};
+
+const convertGifToVideo = (gifFile: File, outputFormat: 'mp4', toast: (options: any) => void): Promise<Blob> => {
+    return new Promise(async (resolve, reject) => {
+        toast({ description: "Starting GIF to MP4 conversion. This can be memory intensive." });
+
+        const { default: GIF } = await import('gif.js');
+
+        const fileReader = new FileReader();
+        fileReader.readAsArrayBuffer(gifFile);
+
+        fileReader.onload = async (event) => {
+            const buffer = event.target?.result as ArrayBuffer;
+            if (!buffer) return reject(new Error("Could not read GIF file"));
+
+            try {
+                // This is a workaround to parse GIF frames using a library designed for encoding.
+                // A proper solution would use a dedicated GIF parsing library.
+                // The gif.js library does not expose a parsing API directly.
+                // We will have to draw the GIF on a canvas and capture frames.
+                
+                const gifUrl = URL.createObjectURL(gifFile);
+                const img = new Image();
+                img.src = gifUrl;
+
+                img.onload = async () => {
+                     // We can't easily get individual frames and their delays from a GIF in the browser.
+                    // This is a major limitation for a high-quality conversion.
+                    // A proper implementation requires a GIF decoder library.
+                    // As a fallback, we treat it as a video-to-video conversion with a mock API.
+                    URL.revokeObjectURL(gifUrl);
+                    toast({ description: "Browser-based GIF to Video conversion is highly experimental and limited." });
+                    const mockResult = await mockApiCall(gifFile, outputFormat, toast);
+                    resolve(mockResult);
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(gifUrl);
+                    reject(new Error("Failed to load GIF as image."));
+                }
+            } catch (error: any) {
+                reject(new Error(`Failed to process GIF: ${error.message}`));
+            }
+        };
+
+        fileReader.onerror = () => {
+            reject(new Error("Failed to read the GIF file."));
         };
     });
 };
 
 
-const convertVideo = async(file: File, outputFormat: 'mp4' | 'gif' | 'mp3', toast: (options: any) => void): Promise<Blob> => {
+const convertVideo = async(file: File, fileType: VideoFileType, outputFormat: 'mp4' | 'gif' | 'mp3' | 'mov', toast: (options: any) => void): Promise<Blob> => {
     if (outputFormat === 'gif') {
         return convertVideoToGif(file, toast);
     }
@@ -392,7 +449,7 @@ const convertPdfToImages = async (
     }
 };
 
-const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targetFormat: Exclude<OutputFormat, 'pdf' | 'svg' | 'zip' | 'ico' | 'mp3' | 'wav' | 'mp4'>): Promise<Blob> => {
+const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targetFormat: Exclude<OutputFormat, 'pdf' | 'svg' | 'zip' | 'ico' | 'mp3' | 'wav' | 'mp4' | 'mov'>): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -506,14 +563,16 @@ export const performConversion = async (file: File, fileType: FileType, outputFo
     let blob: Blob;
     let finalOutputFormat: string = outputFormat;
 
-    const imageOutputFormats = ["png", "jpg", "webp", "bmp"];
-    const audioOutputFormats = ["mp3", "wav"];
-    const videoOutputFormats = ["mp4", "gif"];
+    const imageOutputFormats: (OutputFormat)[] = ["png", "jpg", "webp", "bmp", "gif"];
+    const audioOutputFormats: (OutputFormat)[] = ["mp3", "wav"];
+    const videoOutputFormats: (OutputFormat)[] = ["mp4", "gif", "mov"];
 
     if (audioOutputFormats.includes(outputFormat)) {
         blob = await convertAudio(file, outputFormat as 'mp3' | 'wav', toast);
-    } else if (videoOutputFormats.includes(outputFormat) || (fileType.startsWith('video') && outputFormat === 'mp3')) {
-        blob = await convertVideo(file, outputFormat as 'mp4' | 'gif' | 'mp3', toast);
+    } else if (fileType === 'gif' && outputFormat === 'mp4') {
+        blob = await convertGifToVideo(file, outputFormat, toast);
+    } else if (['mp4', 'mov', 'avi', 'webm'].includes(fileType) && videoOutputFormats.includes(outputFormat)) {
+        blob = await convertVideo(file, fileType as VideoFileType, outputFormat as 'mp4' | 'gif' | 'mov', toast);
     }
     else if (fileType === 'pdf' && imageOutputFormats.includes(outputFormat)) {
         const result = await convertPdfToImages(arrayBuffer, outputFormat as 'png' | 'jpg' | 'webp' | 'bmp', toast);
@@ -555,7 +614,7 @@ export const performConversion = async (file: File, fileType: FileType, outputFo
         }
     }
     else {
-      blob = await convertImage(arrayBuffer, fileType, outputFormat as Exclude<OutputFormat, 'pdf' | 'svg' | 'zip' | 'ico' | 'mp3' | 'wav' | 'mp4'>);
+      blob = await convertImage(arrayBuffer, fileType, outputFormat as Exclude<OutputFormat, 'pdf' | 'svg' | 'zip' | 'ico' | 'mp3' | 'wav' | 'mp4' | 'mov'>);
     }
     return { blob, finalOutputFormat };
 }
