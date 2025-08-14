@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -13,7 +14,7 @@ type FlowStep = "upload" | "config" | "progress" | "result";
 
 interface ConversionFlowProps {
   onComplete: (results: ConversionResult[]) => void;
-  onDone: () => void;
+  onDone: (results: ConversionResult[]) => void;
 }
 
 export function ConversionFlow({ onComplete, onDone }: ConversionFlowProps) {
@@ -48,16 +49,23 @@ export function ConversionFlow({ onComplete, onDone }: ConversionFlowProps) {
     setStep("upload");
   };
   
-  const handleCancel = () => {
+  const handleDone = () => {
+    const successfulConversions = convertedFiles.filter(r => r.status === 'success');
+    onDone(successfulConversions);
     handleReset();
-    onDone();
   }
+
+  const handleCancel = () => {
+    onDone([]); // Pass empty array as no new items should be added to history
+    handleReset();
+  }
+
 
   return (
     <div className="w-full">
         {step !== 'upload' && (
             <div className="mb-4">
-                <Button variant="outline" onClick={onDone}>返回歷史記錄</Button>
+                <Button variant="outline" onClick={handleCancel}>返回歷史記錄</Button>
             </div>
         )}
       {step === "upload" && <FileUploadStep onFilesSelected={handleFilesSelected} />}
@@ -65,7 +73,7 @@ export function ConversionFlow({ onComplete, onDone }: ConversionFlowProps) {
         <FileConfigStep
           files={filesToConvert}
           onConfigComplete={handleConfigComplete}
-          onBack={() => setStep("upload")}
+          onBack={handleCancel}
         />
       )}
       {step === "progress" && (
@@ -75,7 +83,7 @@ export function ConversionFlow({ onComplete, onDone }: ConversionFlowProps) {
         />
       )}
       {step === "result" && (
-        <ConversionResultStep results={convertedFiles} onDone={onDone} />
+        <ConversionResultStep results={convertedFiles} onDone={handleDone} />
       )}
     </div>
   );

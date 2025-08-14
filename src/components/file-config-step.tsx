@@ -6,7 +6,7 @@ import { ConversionResult } from '@/app/page';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Trash2 } from 'lucide-react';
 import { getFileExtension, getFileTypeFromMime, supportedConversions, OutputFormat } from '@/lib/conversions';
 import { getFileIcon } from '@/lib/icons';
 
@@ -53,6 +53,7 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
                 <TableHead>檔名</TableHead>
                 <TableHead>大小</TableHead>
                 <TableHead className="w-[200px]">轉換為</TableHead>
+                <TableHead className="w-[50px] text-right"></TableHead>
             </TableRow>
             </TableHeader>
             <TableBody>
@@ -88,6 +89,11 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
                         )}
                         </SelectContent>
                     </Select>
+                    </TableCell>
+                    <TableCell className="text-right">
+                         <Button variant="ghost" size="icon" onClick={() => handleRemoveTask(task.id)}>
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                        </Button>
                     </TableCell>
                 </TableRow>
                 );

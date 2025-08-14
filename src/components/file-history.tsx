@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -8,8 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { File, Clock, FileText, ImageIcon, CheckCircle, XCircle } from "lucide-react";
+import { File } from "lucide-react";
 import { ConversionResult } from "@/app/page";
 import { getFileIcon } from "@/lib/icons";
 
@@ -30,6 +30,15 @@ export function FileHistory({ history }: FileHistoryProps) {
     );
   }
 
+  // Create a Set of seen IDs to filter out duplicates
+  const seen = new Set();
+  const uniqueHistory = history.filter(item => {
+    const duplicate = seen.has(item.id);
+    seen.add(item.id);
+    return !duplicate;
+  });
+
+
   return (
     <div className="border rounded-lg">
       <Table>
@@ -37,13 +46,11 @@ export function FileHistory({ history }: FileHistoryProps) {
           <TableRow>
             <TableHead className="w-[50px]">類型</TableHead>
             <TableHead>檔名</TableHead>
-            <TableHead>狀態</TableHead>
-            <TableHead>轉換耗時</TableHead>
             <TableHead>轉換時間</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {history.map((item) => (
+          {uniqueHistory.map((item) => (
             <TableRow key={item.id}>
               <TableCell>
                 <div className="w-6 h-6 flex items-center justify-center text-muted-foreground">
@@ -52,22 +59,6 @@ export function FileHistory({ history }: FileHistoryProps) {
               </TableCell>
               <TableCell className="font-medium">{item.inputFile.name}</TableCell>
               <TableCell>
-                {item.status === 'success' ? (
-                  <Badge variant="default" className="bg-green-600 hover:bg-green-700">
-                    <CheckCircle className="mr-1 h-3 w-3" />
-                    成功
-                  </Badge>
-                ) : (
-                  <Badge variant="destructive">
-                     <XCircle className="mr-1 h-3 w-3" />
-                    失敗
-                  </Badge>
-                )}
-              </TableCell>
-              <TableCell>
-                {item.conversionTime ? `${(item.conversionTime / 1000).toFixed(2)} 秒` : '-'}
-              </TableCell>
-               <TableCell>
                 {new Date().toLocaleString()}
               </TableCell>
             </TableRow>

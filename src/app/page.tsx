@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -23,13 +24,14 @@ export default function Home() {
   const [history, setHistory] = useState<ConversionResult[]>([]);
 
   const handleConversionComplete = (results: ConversionResult[]) => {
-    // Only update history, don't change the view here.
-    // The ConversionFlow component will now handle navigating away
-    // from the results page.
-    setHistory((prev) => [...results, ...prev]);
+    // This function is now primarily for potential future use, like logging.
+    // The main history update is handled by handleFlowDone.
+    console.log("Conversion complete:", results);
   };
 
-  const handleFlowDone = () => {
+  const handleFlowDone = (results: ConversionResult[] = []) => {
+    // Add the new results to the history and switch the view.
+    setHistory((prev) => [...results, ...prev]);
     setView("history");
   }
 
