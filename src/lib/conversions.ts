@@ -88,7 +88,7 @@ export const supportedConversions: Record<FileType, OutputFormat[]> = {
     // Images
     jpg: ["png", "pdf", "webp", "gif", "bmp", "svg", "ico"],
     png: ["jpg", "pdf", "webp", "gif", "bmp", "svg", "ico"],
-    gif: ["png", "pdf", "jpg", "webp", "bmp", "ico", "mp4"],
+    gif: ["png", "pdf", "jpg", "webp", "bmp", "ico"],
     bmp: ["png", "pdf", "jpg", "webp", "gif", "svg", "ico"],
     webp: ["png", "pdf", "jpg", "gif", "bmp", "svg", "ico"],
     svg: ["png", "pdf", "jpg", "ico"],
@@ -98,9 +98,9 @@ export const supportedConversions: Record<FileType, OutputFormat[]> = {
     wav: ["mp3"],
     m4a: [],
     ogg: [],
-    // Video (Real conversions)
-    mp4: ["gif"],
-    mov: ["gif"],
+    // Video
+    mp4: [],
+    mov: [],
     avi: [],
     webm: [],
     // Text-based
@@ -145,18 +145,6 @@ export const getFileTypeFromMime = (mime: string, extension: string): FileType =
 
 
 // === CONVERSION HELPERS ===
-
-const mockApiCall = (file: File, outputFormat: string, toast: (options:any) => void): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-        toast({
-            description: `This conversion (${file.type} to ${outputFormat}) is not supported in the browser. This is a placeholder.`
-        });
-        setTimeout(() => {
-            // Simulate an error or dummy file
-             reject(new Error(`Browser-based conversion for ${file.name} to ${outputFormat} is not supported.`));
-        }, 1000);
-    });
-};
 
 const convertAudio = async(file: File, outputFormat: 'mp3' | 'wav', toast: (options: any) => void): Promise<Blob> => {
     toast({ description: "Decoding audio file... This may take a moment." });
@@ -259,155 +247,6 @@ const convertAudio = async(file: File, outputFormat: 'mp3' | 'wav', toast: (opti
     
     // Fallback for any other requested formats
     throw new Error(`Audio conversion to ${outputFormat} is not supported.`);
-}
-
-
-const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<Blob> => {
-    return new Promise(async (resolve, reject) => {
-        toast({ description: "Starting video to GIF conversion. This may be slow and consume significant memory." });
-        
-        const { default: GIF } = await import('gif.js');
-
-        const videoUrl = URL.createObjectURL(file);
-        const video = document.createElement('video');
-        video.muted = true;
-        video.playsInline = true;
-        video.preload = 'metadata'; // Use metadata to get duration faster
-        video.src = videoUrl;
-
-        video.addEventListener('error', (e) => {
-            URL.revokeObjectURL(videoUrl);
-            reject(new Error("Failed to load video file. It might be in an unsupported format or corrupt."));
-        });
-
-        video.addEventListener('loadedmetadata', async () => {
-            // Immediately revoke URL after getting metadata as we don't need it for playback anymore
-            URL.revokeObjectURL(videoUrl);
-            const duration = video.duration;
-
-            if (!isFinite(duration) || duration <= 0) {
-                return reject(new Error("Invalid or zero-length video duration. Cannot convert to GIF."));
-            }
-
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                return reject(new Error("Could not create canvas context."));
-            }
-
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            
-            // Optimization: Lower frame rate and increase quality (higher value is lower quality for gif.js)
-            const frameRate = 8; 
-            const frameDelay = 1000 / frameRate;
-
-            const gif = new GIF({
-                workers: 2,
-                quality: 15, // Increased from 10 to 15 to trade quality for speed
-                workerScript: new URL('gif.js/dist/gif.worker.js', import.meta.url).toString(),
-            });
-
-            gif.on('finished', (blob: Blob) => {
-                video.remove();
-                canvas.remove();
-                resolve(blob);
-            });
-            
-            gif.on('progress', (p: number) => {
-                 toast({ description: `Encoding GIF: ${Math.round(p * 100)}% complete`});
-            });
-
-
-            let currentTime = 0;
-            video.currentTime = currentTime;
-            
-            await new Promise(resolveSeek => {
-                video.addEventListener('seeked', () => resolveSeek(null), { once: true });
-            });
-
-
-            const captureFrame = async () => {
-                if (!ctx) return;
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const validDelay = isFinite(frameDelay) ? frameDelay : 100;
-                gif.addFrame(ctx, { copy: true, delay: validDelay });
-                
-                currentTime += 1 / frameRate;
-
-                if (currentTime <= duration) {
-                    video.currentTime = currentTime;
-                    await new Promise(rs => video.addEventListener('seeked', () => rs(null), { once: true }));
-                    // Use timeout to prevent call stack overflow and unblock the main thread
-                    setTimeout(captureFrame, 0);
-                } else {
-                    toast({ description: "Finalizing GIF, please wait..." });
-                    gif.render();
-                }
-            };
-
-            captureFrame();
-        });
-    });
-};
-
-
-const convertGifToVideo = async (gifFile: File, outputFormat: 'mp4', toast: (options: any) => void): Promise<Blob> => {
-    return new Promise(async (resolve, reject) => {
-        toast({ description: "Decoding GIF frames. This may be slow for large animations." });
-
-        const { default: GIF } = await import('gif.js');
-
-        // This is a workaround to parse GIF frames using gif.js's logic
-        const tempGif = new GIF({ workers: 1, workerScript: new URL('gif.js/dist/gif.worker.js', import.meta.url).toString() });
-        const reader = new FileReader();
-
-        reader.onload = async (e) => {
-            if (!e.target || !e.target.result) {
-                return reject(new Error("Failed to read GIF file."));
-            }
-            const arrayBuffer = e.target.result as ArrayBuffer;
-
-            // This is a super-hacky way to get the frames from the gif.js library,
-            // as it doesn't expose them directly. We'll add one dummy frame,
-            // which forces it to process the input, then intercept the frame data.
-            let frames: any[] = [];
-            const originalAddFrame = (tempGif as any).addFrame;
-            (tempGif as any).addFrame = (image: any, options: any) => {
-                frames.push({ ...options });
-            };
-            
-            (tempGif as any).onRenderFrame({
-              data: new Uint8Array(arrayBuffer)
-            });
-
-            if (frames.length === 0) {
-                return reject(new Error("Could not decode any frames from the GIF."));
-            }
-
-            toast({ description: `Found ${frames.length} frames. Preparing for video encoding...`});
-            
-            // This feature is highly experimental and might not work in all browsers.
-            // A proper implementation would require a WASM-based MP4 muxer.
-            // For now, we will throw a more informative error.
-            reject(new Error("Browser-based GIF to MP4 encoding is not yet supported. This is an experimental stub."));
-        };
-
-        reader.onerror = () => reject(new Error("Error reading GIF file."));
-        reader.readAsArrayBuffer(gifFile);
-    });
-};
-
-
-const convertVideo = async(file: File, fileType: VideoFileType, outputFormat: OutputFormat, toast: (options: any) => void): Promise<Blob> => {
-    if ((fileType === 'mp4' || fileType === 'mov' || fileType === 'webm') && outputFormat === 'gif') {
-        return convertVideoToGif(file, toast);
-    }
-    if (fileType === 'gif' && outputFormat === 'mp4') {
-        return convertGifToVideo(file, outputFormat, toast);
-    }
-    
-    throw new Error(`Video conversion from ${fileType} to ${outputFormat} is not supported.`);
 }
 
 const drawTextInPdf = async (pdfDoc: PDFDocument, textContent: string, useMonospace: boolean = false) => {
@@ -684,14 +523,10 @@ export const performConversion = async (file: File, fileType: FileType, outputFo
 
     const imageOutputFormats: (OutputFormat)[] = ["png", "jpg", "webp", "bmp", "gif"];
     const audioOutputFormats: (OutputFormat)[] = ["mp3", "wav"];
-    const videoOutputFormats: (OutputFormat)[] = ["mp4", "gif"];
-
+    
     if (audioOutputFormats.includes(outputFormat)) {
         blob = await convertAudio(file, outputFormat as 'mp3' | 'wav', toast);
-    } else if (['mp4', 'mov', 'avi', 'webm', 'gif'].includes(fileType) && videoOutputFormats.includes(outputFormat)) {
-        blob = await convertVideo(file, fileType as VideoFileType, outputFormat, toast);
-    }
-    else if (fileType === 'pdf' && imageOutputFormats.includes(outputFormat)) {
+    } else if (fileType === 'pdf' && imageOutputFormats.includes(outputFormat)) {
         const result = await convertPdfToImages(arrayBuffer, outputFormat as 'png' | 'jpg' | 'webp' | 'bmp', toast);
         blob = result.blob;
         if (result.isZip) {
