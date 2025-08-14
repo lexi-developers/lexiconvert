@@ -93,15 +93,15 @@ export const supportedConversions: Record<FileType, OutputFormat[]> = {
   svg: ["png", "pdf", "jpg", "ico"],
   ico: ["png", "jpg", "webp", "bmp", "gif", "pdf"],
   // Audio
-  mp3: ["wav", "m4a", "ogg"],
-  wav: ["mp3", "m4a", "ogg"],
-  m4a: ["mp3", "wav", "ogg"],
-  ogg: ["mp3", "wav", "m4a"],
+  mp3: ["wav"],
+  wav: ["mp3"],
+  m4a: [], // Mocked conversions removed
+  ogg: [], // Mocked conversions removed
   // Video
-  mp4: ["gif", "mp3", "mov"],
-  mov: ["gif", "mp3", "mp4"],
-  avi: ["mp4", "gif", "mp3"],
-  webm: ["mp4", "gif", "mp3"],
+  mp4: ["gif"], // "mp3" extraction is possible but complex. "mov" is not.
+  mov: ["gif"], // "mp3" extraction is possible. "mp4" is not.
+  avi: [], // Cannot be processed reliably in-browser
+  webm: [], // Cannot be processed reliably in-browser
   // Text-based
   html: ["pdf"],
   xml: ["pdf"],
@@ -116,6 +116,7 @@ export const supportedConversions: Record<FileType, OutputFormat[]> = {
   // Unknown
   unknown: [],
 };
+
 
 // === HELPER FUNCTIONS ===
 
@@ -146,30 +147,17 @@ export const getFileTypeFromMime = (mime: string, extension: string): FileType =
 const mockApiCall = (file: File, outputFormat: string, toast: (options:any) => void): Promise<Blob> => {
     return new Promise((resolve, reject) => {
         toast({
-            description: `This is a placeholder. In a real app, '${file.name}' would be uploaded and converted to ${outputFormat.toUpperCase()} on a server.`
+            description: `This conversion (${file.type} to ${outputFormat}) is not supported in the browser. This is a placeholder.`
         });
         setTimeout(() => {
-            // Simulate a successful conversion by creating a dummy file
-            const dummyContent = `This is a mock converted ${outputFormat.toUpperCase()} file from ${file.name}.`;
-            let mimeType = 'application/octet-stream';
-            if (['mp4', 'mov'].includes(outputFormat)) {
-                mimeType = `video/${outputFormat}`;
-            } else if (['mp3', 'wav', 'ogg', 'm4a'].includes(outputFormat)) {
-                mimeType = `audio/${outputFormat}`;
-            }
-            const blob = new Blob([dummyContent], { type: mimeType });
-            resolve(blob);
-        }, 3000);
+            // Simulate an error or dummy file
+             reject(new Error(`Browser-based conversion for ${file.name} to ${outputFormat} is not supported.`));
+        }, 1000);
     });
 };
 
-const convertAudio = async(file: File, outputFormat: 'mp3' | 'wav' | 'm4a' | 'ogg', toast: (options: any) => void): Promise<Blob> => {
-    if (outputFormat === 'm4a' || outputFormat === 'ogg') {
-        toast({ description: "Browser-based conversion to M4A or OGG is not supported. This is a mock conversion." });
-        return mockApiCall(file, outputFormat, toast);
-    }
-
-    toast({ description: "Decoding audio file... This may take a moment for large files." });
+const convertAudio = async(file: File, outputFormat: 'mp3' | 'wav', toast: (options: any) => void): Promise<Blob> => {
+    toast({ description: "Decoding audio file... This may take a moment." });
 
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     const arrayBuffer = await file.arrayBuffer();
@@ -178,57 +166,99 @@ const convertAudio = async(file: File, outputFormat: 'mp3' | 'wav' | 'm4a' | 'og
     if (outputFormat === 'wav') {
         toast({ description: "Encoding to WAV..." });
         // Source: https://github.com/awordforthat/web-audio-recording-tests/blob/master/js/WavAudioEncoder.js
-        const [left, right] = [audioBuffer.getChannelData(0), audioBuffer.getChannelData(1)];
-        const interleaved = new Float32Array(left.length + right.length);
-        for (let i = 0, len = left.length; i < len; i++) {
-            interleaved[i * 2] = left[i];
-            interleaved[i * 2 + 1] = right[i];
-        }
+        const getWavBlob = (buffer: AudioBuffer) => {
+            const numOfChan = buffer.numberOfChannels;
+            const length = buffer.length * numOfChan * 2 + 44;
+            const bufferArray = new ArrayBuffer(length);
+            const view = new DataView(bufferArray);
+            const channels = [];
+            let i, sample;
+            let offset = 0;
+            let pos = 0;
 
-        const buffer = new ArrayBuffer(44 + interleaved.length * 2);
-        const view = new DataView(buffer);
-
-        // RIFF chunk descriptor
-        const writeString = (view: DataView, offset: number, string: string) => {
-            for (let i = 0; i < string.length; i++) {
-                view.setUint8(offset + i, string.charCodeAt(i));
+            // write WAV header
+            const setUint16 = (data: number) => {
+                view.setUint16(pos, data, true);
+                pos += 2;
             }
-        };
+            const setUint32 = (data: number) => {
+                view.setUint32(pos, data, true);
+                pos += 4;
+            }
 
-        writeString(view, 0, 'RIFF');
-        view.setUint32(4, 32 + interleaved.length * 2, true);
-        writeString(view, 8, 'WAVE');
-        writeString(view, 12, 'fmt ');
-        view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true);
-        view.setUint16(22, 2, true);
-        view.setUint32(24, audioBuffer.sampleRate, true);
-        view.setUint32(28, audioBuffer.sampleRate * 4, true);
-        view.setUint16(32, 4, true);
-        view.setUint16(34, 16, true);
-        writeString(view, 36, 'data');
-        view.setUint32(40, interleaved.length * 2, true);
+            setUint32(0x46464952); // "RIFF"
+            setUint32(length - 8); // file length - 8
+            setUint32(0x45564157); // "WAVE"
 
-        // Write the PCM samples
-        let lng = interleaved.length;
-        let index = 44;
-        let volume = 1;
-        for (let i = 0; i < lng; i++) {
-            view.setInt16(index, interleaved[i] * (0x7FFF * volume), true);
-            index += 2;
+            setUint32(0x20746d66); // "fmt " chunk
+            setUint32(16); // length = 16
+            setUint16(1); // PCM (uncompressed)
+            setUint16(numOfChan);
+            setUint32(buffer.sampleRate);
+            setUint32(buffer.sampleRate * 2 * numOfChan); // avg bytes/sec
+            setUint16(numOfChan * 2); // block-align
+            setUint16(16); // 16-bit
+
+            setUint32(0x61746164); // "data" - chunk
+            setUint32(length - pos - 4); // chunk length
+
+            // write interleaved data
+            for (i = 0; i < numOfChan; i++) {
+                channels.push(buffer.getChannelData(i));
+            }
+
+            while (pos < length) {
+                for (i = 0; i < numOfChan; i++) {
+                    sample = Math.max(-1, Math.min(1, channels[i][offset])); // clamp
+                    sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0; // scale to 16-bit signed int
+                    view.setInt16(pos, sample, true);
+                    pos += 2;
+                }
+                offset++;
+            }
+            return new Blob([view], { type: 'audio/wav' });
         }
-
-        return new Blob([view], { type: 'audio/wav' });
+        return getWavBlob(audioBuffer);
     }
 
     if (outputFormat === 'mp3') {
-        toast({ description: "MP3 encoding in the browser is experimental and slow. This is a mock conversion for now." });
-        return mockApiCall(file, outputFormat, toast);
+        toast({ description: "MP3 encoding in the browser is experimental and may be slow. Please wait." });
+        // Dynamically import lamejs
+        const { Mp3Encoder } = await import('lamejs');
+        const encoder = new Mp3Encoder(audioBuffer.numberOfChannels, audioBuffer.sampleRate, 128); // 128 kbps
+        const mp3Data = [];
+        
+        const samples = new Int16Array(44100); // chunk size
+        let remaining = audioBuffer.length;
+        
+        for (let i = 0; remaining >= 0; i += samples.length) {
+            const left = audioBuffer.getChannelData(0).subarray(i, i + samples.length);
+            const right = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1).subarray(i, i + samples.length) : left;
+            
+            // convert to Int16
+            for (let j = 0; j < left.length; j++) {
+                samples[j] = Math.max(-1, Math.min(1, left[j])) * 32767;
+            }
+            
+            const mp3buf = encoder.encodeBuffer(samples);
+            if (mp3buf.length > 0) {
+                mp3Data.push(new Int8Array(mp3buf));
+            }
+            remaining -= samples.length;
+        }
+        
+        const mp3buf = encoder.flush();
+        if (mp3buf.length > 0) {
+            mp3Data.push(new Int8Array(mp3buf));
+        }
+
+        return new Blob(mp3Data, { type: 'audio/mpeg' });
     }
     
     // Fallback for any other requested formats
     return mockApiCall(file, outputFormat, toast);
 }
+
 
 const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<Blob> => {
     return new Promise(async (resolve, reject) => {
@@ -240,6 +270,7 @@ const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<B
         const videoUrl = URL.createObjectURL(file);
         const video = document.createElement('video');
         video.muted = true;
+        video.playsInline = true;
         video.src = videoUrl;
 
         const canvas = document.createElement('canvas');
@@ -263,13 +294,11 @@ const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<B
             });
 
             video.currentTime = 0;
-            let framesAdded = 0;
 
-            video.onseeked = () => {
+            const captureFrame = () => {
                 if (!ctx) return;
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 gif.addFrame(ctx, { copy: true, delay: frameDelay });
-                framesAdded++;
 
                 if (video.currentTime < duration) {
                     video.currentTime += 1 / frameRate;
@@ -285,8 +314,10 @@ const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<B
                 }
             };
 
+            video.onseeked = captureFrame;
+            
             // Start the process
-            video.onseeked(new Event('seeked'));
+            video.currentTime = 0.1; // Seek to first frame to trigger onseeked
         };
 
         video.onerror = (e) => {
@@ -298,7 +329,7 @@ const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<B
 
 const convertGifToVideo = (gifFile: File, outputFormat: 'mp4', toast: (options: any) => void): Promise<Blob> => {
     return new Promise(async (resolve, reject) => {
-        toast({ description: "Browser-based GIF to Video conversion is highly experimental and limited. Using mock API as a fallback." });
+        toast({ description: "Browser-based GIF to Video conversion is not supported. This is a placeholder." });
         const mockResult = await mockApiCall(gifFile, outputFormat, toast);
         resolve(mockResult);
     });
@@ -589,11 +620,11 @@ export const performConversion = async (file: File, fileType: FileType, outputFo
     let finalOutputFormat: string = outputFormat;
 
     const imageOutputFormats: (OutputFormat)[] = ["png", "jpg", "webp", "bmp", "gif"];
-    const audioOutputFormats: (OutputFormat)[] = ["mp3", "wav", "m4a", "ogg"];
-    const videoOutputFormats: (OutputFormat)[] = ["mp4", "gif", "mov", "mp3"];
+    const audioOutputFormats: (OutputFormat)[] = ["mp3", "wav"];
+    const videoOutputFormats: (OutputFormat)[] = ["mp4", "gif"];
 
     if (audioOutputFormats.includes(outputFormat)) {
-        blob = await convertAudio(file, outputFormat as 'mp3' | 'wav' | 'm4a' | 'ogg', toast);
+        blob = await convertAudio(file, outputFormat as 'mp3' | 'wav', toast);
     } else if (['mp4', 'mov', 'avi', 'webm'].includes(fileType) && videoOutputFormats.includes(outputFormat)) {
         blob = await convertVideo(file, fileType as VideoFileType, outputFormat, toast);
     }
