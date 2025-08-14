@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://placehold.co/600x300.png" alt="LexiConvert Banner" data-ai-hint="abstract document conversion" />
+  <img src="Picture/logo.png" alt="LexiConvert Banner" data-ai-hint="abstract document conversion" />
 </p>
 
 # LexiConvert
