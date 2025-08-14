@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, FileUp } from "lucide-react";
 import { FileHistory } from "@/components/file-history";
 import { ConversionFlow } from "@/components/conversion-flow";
 import { Button } from "@/components/ui/button";
@@ -63,14 +63,28 @@ export default function Home() {
         {history.length > 0 ? (
           <FileHistory history={history} />
         ) : (
-          <div className="text-center py-24">
-             <h2 className="text-2xl font-semibold text-muted-foreground">立即開始你的轉換</h2>
-          </div>
+          <div className="flex items-center justify-center h-[60vh]">
+            <div className="text-center p-8 border border-dashed rounded-lg">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                    <FileUp className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <h3 className="mt-4 text-lg font-medium">No conversions yet</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                    Click the button below to start your first file conversion.
+                </p>
+                <div className="mt-6">
+                    <Button onClick={() => setIsConversionFlowOpen(true)}>
+                        <Plus className="-ml-0.5 mr-1.5 h-5 w-5" />
+                        New Conversion
+                    </Button>
+                </div>
+            </div>
+        </div>
         )}
 
       </div>
        <Dialog open={isConversionFlowOpen} onOpenChange={setIsConversionFlowOpen}>
-          <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col p-0" hideCloseButton={true}>
+          <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col p-0 rounded-lg" hideCloseButton={true}>
               <ConversionFlow onDone={handleFlowDone} />
           </DialogContent>
        </Dialog>
