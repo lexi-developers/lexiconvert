@@ -45,7 +45,7 @@ type ConversionStatus = "idle" | "converting" | "success" | "error";
 type DocumentFileType = "docx" | "txt" | "epub" | "xlsx" | "pptx";
 type ImageFileType = "jpg" | "png" | "gif" | "bmp" | "webp" | "svg";
 type FileType = DocumentFileType | ImageFileType | "unknown";
-type OutputFormat = "pdf" | "jpg" | "png" | "webp" | "gif" | "bmp";
+type OutputFormat = "pdf" | "jpg" | "png" | "webp" | "gif" | "bmp" | "svg";
 
 const mimeTypeToType: Record<string, FileType> = {
   // Documents
@@ -93,6 +93,7 @@ const getFileTypeFromMime = (mime: string, extension: string): FileType => {
     if (extension === 'docx') return 'docx';
     if (extension === 'xlsx') return 'xlsx';
     if (extension === 'pptx') return 'pptx';
+    if (extension === 'svg') return 'svg';
     return "unknown";
 }
 
@@ -113,6 +114,10 @@ export function Converter() {
     if (!file || fileType === "unknown") return [];
     
     const extension = getFileExtension(file.name) as OutputFormat;
+    // Special case for svg, it can't be converted to itself
+    if (fileType === 'svg') {
+        return supportedConversions[fileType] || [];
+    }
     return (supportedConversions[fileType] || []).filter(f => f !== extension);
     
   }, [file, fileType]);
@@ -282,7 +287,7 @@ export function Converter() {
     return new Blob([pdfBytes], { type: "application/pdf" });
   };
   
-  const convertImage = async (arrayBuffer: ArrayBuffer, targetFormat: Exclude<OutputFormat, 'pdf'>): Promise<Blob> => {
+  const convertImage = async (arrayBuffer: ArrayBuffer, targetFormat: Exclude<OutputFormat, 'pdf' | 'svg'>): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
@@ -300,7 +305,17 @@ export function Converter() {
         }, targetMimeType, 0.95);
       };
       img.onerror = () => reject(new Error('圖片載入失敗。檔案可能已損毀或格式不支援。'));
-      img.src = URL.createObjectURL(new Blob([arrayBuffer], { type: file?.type }));
+
+      let srcUrl: string;
+      if (fileType === 'svg') {
+        const decoder = new TextDecoder('utf-8');
+        const svgString = decoder.decode(arrayBuffer);
+        srcUrl = 'data:image/svg+xml;base64,' + btoa(svgString);
+      } else {
+        srcUrl = URL.createObjectURL(new Blob([arrayBuffer], { type: file?.type }));
+      }
+      
+      img.src = srcUrl;
     });
   };
 
@@ -322,7 +337,11 @@ export function Converter() {
 
       if (outputFormat === 'pdf') {
         blob = await convertToPdf(arrayBuffer);
-      } else {
+      } else if (outputFormat === 'svg') {
+         // This path should not be taken as per current logic.
+         throw new Error("圖片轉 SVG 目前不支援。");
+      }
+      else {
         blob = await convertImage(arrayBuffer, outputFormat);
       }
       
@@ -402,7 +421,7 @@ export function Converter() {
             <p className="mt-4 text-center text-muted-foreground">
               <span className="font-semibold text-primary">點擊上傳</span> 或拖放檔案
             </p>
-            <p className="text-xs text-muted-foreground mt-1">支援 DOCX, XLSX, TXT, EPUB, JPG, PNG 等格式</p>
+            <p className="text-xs text-muted-foreground mt-1">支援 DOCX, XLSX, TXT, EPUB, JPG, PNG, SVG 等格式</p>
             <input
               ref={fileInputRef}
               type="file"
