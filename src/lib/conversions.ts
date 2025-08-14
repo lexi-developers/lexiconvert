@@ -6,6 +6,10 @@ import * as XLSX from 'xlsx';
 import { Potrace } from 'potrace';
 import * as pdfjsLib from 'pdfjs-dist';
 import { toast } from "@/hooks/use-toast";
+// Note: We need a GIF encoding library. Let's assume a utility exists for that.
+// We'll define a placeholder function and implement it.
+import {-!TBD!- as createGifEncoder} from './gif-encoder';
+
 
 // For Next.js, set the worker source
 if (typeof window !== 'undefined') {
@@ -162,8 +166,73 @@ const convertAudio = async(file: File, outputFormat: 'mp3' | 'wav', toast: (opti
     return mockApiCall(file, outputFormat, toast);
 }
 
+const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+        toast({ description: "Starting video to GIF conversion. This may be slow and consume significant memory." });
+
+        const videoUrl = URL.createObjectURL(file);
+        const video = document.createElement('video');
+        video.muted = true;
+        video.src = videoUrl;
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            return reject(new Error("Could not create canvas context."));
+        }
+
+        video.onloadedmetadata = async () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const duration = video.duration;
+            const frameRate = 10; // Capture 10 frames per second
+            const frameDelay = 1000 / frameRate; // Delay in ms
+
+            // We will use a dynamic library for GIF encoding
+            const { default: GIF } = await import('gif.js');
+            const gif = new GIF({
+                workers: 2,
+                quality: 10,
+                workerScript: new URL('gif.js/dist/gif.worker.js', import.meta.url).toString(),
+            });
+
+            video.currentTime = 0;
+
+            video.onseeked = () => {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                gif.addFrame(ctx, { copy: true, delay: frameDelay });
+
+                if (video.currentTime < duration) {
+                    video.currentTime += 1 / frameRate;
+                } else {
+                    toast({ description: "Finalizing GIF, please wait..." });
+                    gif.on('finished', (blob: Blob) => {
+                        URL.revokeObjectURL(videoUrl);
+                        video.remove();
+                        canvas.remove();
+                        resolve(blob);
+                    });
+                    gif.render();
+                }
+            };
+
+            // Start the process
+            video.currentTime = 0;
+        };
+
+        video.onerror = (e) => {
+            URL.revokeObjectURL(videoUrl);
+            reject(new Error("Failed to load video file."));
+        };
+    });
+};
+
+
 const convertVideo = async(file: File, outputFormat: 'mp4' | 'gif' | 'mp3', toast: (options: any) => void): Promise<Blob> => {
-    // In a real app, this would be an API call to a backend with FFMPEG
+    if (outputFormat === 'gif') {
+        return convertVideoToGif(file, toast);
+    }
+    // In a real app, this would be an API call to a backend with FFMPEG for other formats
     return mockApiCall(file, outputFormat, toast);
 }
 

@@ -25,5 +25,5 @@
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"],
-  "types": ["@types/js-levenshtein", "@types/xlsx"]
+  "types": ["@types/js-levenshtein", "@types/xlsx", "@types/gif.js"]
 }
