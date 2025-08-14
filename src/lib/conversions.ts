@@ -164,7 +164,69 @@ const mockApiCall = (file: File, outputFormat: string, toast: (options:any) => v
 };
 
 const convertAudio = async(file: File, outputFormat: 'mp3' | 'wav' | 'm4a' | 'ogg', toast: (options: any) => void): Promise<Blob> => {
-    // In a real app, this would be an API call to a backend with FFMPEG
+    if (outputFormat === 'm4a' || outputFormat === 'ogg') {
+        toast({ description: "Browser-based conversion to M4A or OGG is not supported. This is a mock conversion." });
+        return mockApiCall(file, outputFormat, toast);
+    }
+
+    toast({ description: "Decoding audio file... This may take a moment for large files." });
+
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const arrayBuffer = await file.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    if (outputFormat === 'wav') {
+        toast({ description: "Encoding to WAV..." });
+        // Source: https://github.com/awordforthat/web-audio-recording-tests/blob/master/js/WavAudioEncoder.js
+        const [left, right] = [audioBuffer.getChannelData(0), audioBuffer.getChannelData(1)];
+        const interleaved = new Float32Array(left.length + right.length);
+        for (let i = 0, len = left.length; i < len; i++) {
+            interleaved[i * 2] = left[i];
+            interleaved[i * 2 + 1] = right[i];
+        }
+
+        const buffer = new ArrayBuffer(44 + interleaved.length * 2);
+        const view = new DataView(buffer);
+
+        // RIFF chunk descriptor
+        const writeString = (view: DataView, offset: number, string: string) => {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        };
+
+        writeString(view, 0, 'RIFF');
+        view.setUint32(4, 32 + interleaved.length * 2, true);
+        writeString(view, 8, 'WAVE');
+        writeString(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 2, true);
+        view.setUint32(24, audioBuffer.sampleRate, true);
+        view.setUint32(28, audioBuffer.sampleRate * 4, true);
+        view.setUint16(32, 4, true);
+        view.setUint16(34, 16, true);
+        writeString(view, 36, 'data');
+        view.setUint32(40, interleaved.length * 2, true);
+
+        // Write the PCM samples
+        let lng = interleaved.length;
+        let index = 44;
+        let volume = 1;
+        for (let i = 0; i < lng; i++) {
+            view.setInt16(index, interleaved[i] * (0x7FFF * volume), true);
+            index += 2;
+        }
+
+        return new Blob([view], { type: 'audio/wav' });
+    }
+
+    if (outputFormat === 'mp3') {
+        toast({ description: "MP3 encoding in the browser is experimental and slow. This is a mock conversion for now." });
+        return mockApiCall(file, outputFormat, toast);
+    }
+    
+    // Fallback for any other requested formats
     return mockApiCall(file, outputFormat, toast);
 }
 
@@ -244,8 +306,11 @@ const convertGifToVideo = (gifFile: File, outputFormat: 'mp4', toast: (options: 
 
 
 const convertVideo = async(file: File, fileType: VideoFileType, outputFormat: OutputFormat, toast: (options: any) => void): Promise<Blob> => {
-    if (outputFormat === 'gif') {
+    if ((fileType === 'mp4' || fileType === 'mov' || fileType === 'webm') && outputFormat === 'gif') {
         return convertVideoToGif(file, toast);
+    }
+    if (fileType === 'gif' && outputFormat === 'mp4') {
+        return convertGifToVideo(file, outputFormat, toast);
     }
     // In a real app, this would be an API call to a backend with FFMPEG for other formats
     return mockApiCall(file, outputFormat, toast);
@@ -529,8 +594,6 @@ export const performConversion = async (file: File, fileType: FileType, outputFo
 
     if (audioOutputFormats.includes(outputFormat)) {
         blob = await convertAudio(file, outputFormat as 'mp3' | 'wav' | 'm4a' | 'ogg', toast);
-    } else if (fileType === 'gif' && outputFormat === 'mp4') {
-        blob = await convertGifToVideo(file, outputFormat, toast);
     } else if (['mp4', 'mov', 'avi', 'webm'].includes(fileType) && videoOutputFormats.includes(outputFormat)) {
         blob = await convertVideo(file, fileType as VideoFileType, outputFormat, toast);
     }
