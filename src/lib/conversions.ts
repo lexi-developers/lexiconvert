@@ -6,9 +6,6 @@ import * as XLSX from 'xlsx';
 import { Potrace } from 'potrace';
 import * as pdfjsLib from 'pdfjs-dist';
 import { toast } from "@/hooks/use-toast";
-// Note: We need a GIF encoding library. Let's assume a utility exists for that.
-// We'll define a placeholder function and implement it.
-import {-!TBD!- as createGifEncoder} from './gif-encoder';
 
 
 // For Next.js, set the worker source
