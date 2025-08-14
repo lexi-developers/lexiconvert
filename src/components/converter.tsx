@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useCallback, useRef, useMemo } from "react";
@@ -111,7 +112,7 @@ const drawTextInPdf = async (pdfDoc: PDFDocument, textContent: string) => {
     });
 }
 
-const convertEpubToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
+const convertEpubToPdf = async (arrayBuffer: ArrayBuffer, toast: (options: { title: string; description: string; }) => void): Promise<Blob> => {
     const book = ePub(arrayBuffer);
     const pdfDoc = await PDFDocument.create();
     await book.ready;
@@ -131,7 +132,7 @@ const convertEpubToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
     return new Blob([pdfBytes], { type: "application/pdf" });
 };
 
-const convertDocxToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
+const convertDocxToPdf = async (arrayBuffer: ArrayBuffer, toast: (options: { title: string; description: string; }) => void): Promise<Blob> => {
     const zip = await JSZip.loadAsync(arrayBuffer);
     const content = await zip.file("word/document.xml")?.async("string");
     
@@ -154,7 +155,7 @@ const convertDocxToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
     return new Blob([pdfBytes], { type: "application/pdf" });
 }
 
-const convertXlsxToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
+const convertXlsxToPdf = async (arrayBuffer: ArrayBuffer, toast: (options: { title: string; description: string; }) => void): Promise<Blob> => {
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
@@ -243,7 +244,7 @@ const convertToPng = async (arrayBuffer: ArrayBuffer, sourceType: FileType): Pro
   return blob.arrayBuffer();
 }
 
-const convertToSvg = (buffer: Buffer): Promise<Blob> => {
+const convertToSvg = (buffer: Buffer, toast: (options: { title: string; description: string; }) => void): Promise<Blob> => {
     return new Promise((resolve, reject) => {
         toast({ title: "圖片轉 SVG 限制", description: "此為實驗性功能，複雜圖片轉換效果可能不佳。" });
         const potrace = new Potrace();
@@ -308,31 +309,32 @@ export function Converter() {
   }
 
   const handleFileChange = (files: FileList | null) => {
-    if (files && files.length > 0) {
-      const selectedFile = files[0];
-      if (!selectedFile) {
+    if (!files || files.length === 0) {
+      return;
+    }
+    const selectedFile = files[0];
+    if (!selectedFile) {
         return;
-      }
-      resetState();
-      
-      const extension = getFileExtension(selectedFile.name);
-      const detectedType = getFileTypeFromMime(selectedFile.type, extension);
+    }
+    resetState();
+    
+    const extension = getFileExtension(selectedFile.name);
+    const detectedType = getFileTypeFromMime(selectedFile.type, extension);
 
-       if (detectedType === "unknown" || supportedConversions[detectedType].length === 0) {
-        handleUnsupportedFile(extension);
-        return;
-      }
-      
-      setFile(selectedFile);
-      setFileType(detectedType);
-      
-      const possibleFormats = (supportedConversions[detectedType] || []).filter(f => f !== extension);
+     if (detectedType === "unknown" || supportedConversions[detectedType].length === 0) {
+      handleUnsupportedFile(extension);
+      return;
+    }
+    
+    setFile(selectedFile);
+    setFileType(detectedType);
+    
+    const possibleFormats = (supportedConversions[detectedType] || []).filter(f => f !== extension);
 
-      if (possibleFormats.length > 0) {
-        setOutputFormat(possibleFormats[0]);
-      } else {
-        setOutputFormat(null);
-      }
+    if (possibleFormats.length > 0) {
+      setOutputFormat(possibleFormats[0]);
+    } else {
+      setOutputFormat(null);
     }
   };
 
@@ -361,16 +363,16 @@ export function Converter() {
 
       if (outputFormat === 'pdf') {
           switch(fileType) {
-              case 'epub': blob = await convertEpubToPdf(arrayBuffer); break;
-              case 'docx': blob = await convertDocxToPdf(arrayBuffer); break;
-              case 'xlsx': blob = await convertXlsxToPdf(arrayBuffer); break;
+              case 'epub': blob = await convertEpubToPdf(arrayBuffer, toast); break;
+              case 'docx': blob = await convertDocxToPdf(arrayBuffer, toast); break;
+              case 'xlsx': blob = await convertXlsxToPdf(arrayBuffer, toast); break;
               case 'txt': blob = await convertTxtToPdf(arrayBuffer); break;
               default: blob = await convertImageToPdf(fileType, arrayBuffer); break;
           }
       } else if (outputFormat === 'svg') {
           if (fileType === 'jpg' || fileType === 'png' || fileType === 'bmp' || fileType === 'gif' || fileType === 'webp') {
               const buffer = Buffer.from(arrayBuffer);
-              blob = await convertToSvg(buffer);
+              blob = await convertToSvg(buffer, toast);
           } else {
               throw new Error("僅支援圖片格式轉為 SVG。");
           }
