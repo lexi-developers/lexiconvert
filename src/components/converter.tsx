@@ -73,7 +73,7 @@ const supportedConversions: Record<FileType, OutputFormat[]> = {
   epub: ["pdf"],
   jpg: ["pdf", "png", "webp", "gif", "bmp", "svg"],
   png: ["pdf", "jpg", "webp", "gif", "bmp", "svg"],
-  gif: ["pdf", "jpg", "png", "webp", "bmp", "svg"],
+  gif: ["pdf", "jpg", "png", "webp", "bmp"],
   bmp: ["pdf", "jpg", "png", "webp", "gif", "svg"],
   webp: ["pdf", "jpg", "png", "gif", "bmp", "svg"],
   svg: ["pdf", "png", "jpg"],
@@ -91,6 +91,9 @@ const getFileTypeFromMime = (mime: string, extension: string): FileType => {
     // Fallback for types not correctly reported by browser
     if (extension === 'jpg' || extension === 'jpeg') return 'jpg';
     if (extension === 'png') return 'png';
+    if (extension === 'gif') return 'gif';
+    if (extension === 'bmp') return 'bmp';
+    if (extension === 'webp') return 'webp';
     if (extension === 'epub') return 'epub';
     if (extension === 'docx') return 'docx';
     if (extension === 'xlsx') return 'xlsx';
@@ -457,7 +460,7 @@ export function Converter() {
             <p className="mt-4 text-center text-muted-foreground">
               <span className="font-semibold text-primary">點擊上傳</span> 或拖放檔案
             </p>
-            <p className="text-xs text-muted-foreground mt-1">支援 DOCX, XLSX, TXT, EPUB, JPG, PNG, SVG 等格式</p>
+            <p className="text-xs text-muted-foreground mt-1">支援 DOCX, XLSX, TXT, EPUB, JPG, PNG, GIF, BMP, WebP, SVG 等格式</p>
             <input
               ref={fileInputRef}
               type="file"
@@ -551,3 +554,5 @@ export function Converter() {
     </Card>
   );
 }
+
+    
