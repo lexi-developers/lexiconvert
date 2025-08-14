@@ -72,8 +72,8 @@ export function ConversionFlow({ onDone }: ConversionFlowProps) {
   }
 
   const handleCloseRequest = () => {
-    // If we're on the first step or the last step, close immediately.
-    // Otherwise, ask for confirmation.
+    // If we're on the first step, the result step, or have no files, we can close directly.
+    // Otherwise, we need to ask for confirmation.
     if (step === 'upload' || step === 'result' || filesToConvert.length === 0) {
         onDone([]); // Pass empty array to signify cancellation
         handleReset();
@@ -83,9 +83,9 @@ export function ConversionFlow({ onDone }: ConversionFlowProps) {
   }
 
   const handleConfirmCancel = () => {
+    setIsCancelAlertOpen(false);
     onDone([]);
     handleReset();
-    setIsCancelAlertOpen(false);
   }
 
   const getTitleForStep = () => {
