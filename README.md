@@ -41,7 +41,7 @@ You can easily deploy and run LexiConvert on your own machine. Follow these step
 1.  **Clone the Repository**
     First, clone the project to your local machine using `git`.
     ```bash
-    git clone https://github.com/your-username/lexiconvert.git
+    git clone https://github.com/lexi-developers/lexiconvert.git
     cd lexiconvert
     ```
 
