@@ -15,9 +15,9 @@ if (typeof window !== 'undefined') {
 }
 
 // === UNIQUE ID GENERATOR ===
-let idCounter = 0;
 export const generateUniqueId = (filename: string) => {
-    return `${filename}-${Date.now()}-${idCounter++}`;
+    // Use Math.random() to ensure uniqueness even across hot-reloads.
+    return `${filename}-${Date.now()}-${Math.random()}`;
 }
 
 // === TYPES AND CONSTANTS ===
