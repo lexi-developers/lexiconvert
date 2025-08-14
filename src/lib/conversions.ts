@@ -284,6 +284,13 @@ const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<B
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             const duration = video.duration;
+
+            // BUG FIX: Ensure duration is a valid number before calculating frameRate and frameDelay.
+            if (!duration || !isFinite(duration) || duration <= 0) {
+                 URL.revokeObjectURL(videoUrl);
+                 return reject(new Error("Invalid video duration. Cannot convert to GIF."));
+            }
+
             const frameRate = 10; // Capture 10 frames per second
             const frameDelay = 1000 / frameRate; // Delay in ms
 
@@ -298,7 +305,10 @@ const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<B
             const captureFrame = () => {
                 if (!ctx) return;
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                gif.addFrame(ctx, { copy: true, delay: frameDelay });
+                
+                // BUG FIX: Ensure frameDelay is a valid number before adding frame
+                const validDelay = isFinite(frameDelay) ? frameDelay : 100;
+                gif.addFrame(ctx, { copy: true, delay: validDelay });
 
                 if (video.currentTime < duration) {
                     video.currentTime += 1 / frameRate;
@@ -327,13 +337,13 @@ const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<B
     });
 };
 
-const convertGifToVideo = (gifFile: File, outputFormat: 'mp4', toast: (options: any) => void): Promise<Blob> => {
-    return new Promise(async (resolve, reject) => {
-        toast({ description: "Browser-based GIF to Video conversion is not supported. This is a placeholder." });
-        // This is a complex operation that usually requires a backend.
-        // For now, we will reject with an informative error.
-        reject(new Error(`Browser-based GIF to ${outputFormat} conversion is not supported.`));
-    });
+const convertGifToVideo = async (gifFile: File, outputFormat: 'mp4', toast: (options: any) => void): Promise<Blob> => {
+    toast({ description: "Browser-based GIF to Video conversion is not fully supported. This is an experimental feature." });
+    
+    // This is a placeholder for a feature that is complex to implement client-side.
+    // In a real application, this would ideally be a server-side conversion.
+    // For now, we will throw an error to indicate it's not implemented.
+    throw new Error(`Browser-based GIF to ${outputFormat} conversion is not supported in this version.`);
 };
 
 
