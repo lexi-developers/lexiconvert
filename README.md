@@ -34,7 +34,7 @@ LexiConvert is a file conversion application designed for users who prioritize p
 
 ---
 
-## 🛠️ Quick Start (Local Deployment)
+## 🛠️ Quick Start (Local Deployment Offline use)
 
 You can easily deploy and run LexiConvert on your own machine. Follow these steps:
 
