@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Download, CheckCircle, XCircle, FileArchive } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import JSZip from 'jszip';
+import { usePreview } from "@/context/preview-provider";
 
 interface ConversionResultStepProps {
   results: ConversionResult[];
@@ -23,12 +24,14 @@ const getOutputFilename = (inputFile: File, outputFileType?: string): string => 
 
 export function ConversionResultStep({ results, onDone }: ConversionResultStepProps) {
   const [selectedResults, setSelectedResults] = useState<Set<string>>(new Set());
+  const { showPreview } = usePreview();
   
   const successfulConversions = results.filter(r => r.status === 'success');
 
   // Pre-select all successful conversions on initial render
   useEffect(() => {
     setSelectedResults(new Set(successfulConversions.map(r => r.id)));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [results]); // Dependency on results ensures this runs only when results change
 
   const handleSelectAll = (checked: boolean) => {
@@ -91,7 +94,11 @@ export function ConversionResultStep({ results, onDone }: ConversionResultStepPr
 
   const selectedCount = selectedResults.size;
   const allSuccessfulSelected = selectedCount === successfulConversions.length && successfulConversions.length > 0;
-  const someSuccessfulSelected = selectedCount > 0 && selectedCount < successfulConversions.length;
+  
+  const handlePreview = (e: React.MouseEvent, file: File | Blob, fileName: string) => {
+    e.preventDefault();
+    showPreview(file, fileName);
+  };
 
 
   return (
@@ -109,7 +116,7 @@ export function ConversionResultStep({ results, onDone }: ConversionResultStepPr
                     <TableHead className="w-[40px]">
                        <Checkbox
                         checked={allSuccessfulSelected}
-                        onCheckedChange={handleSelectAll}
+                        onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
                         aria-label="Select all"
                         disabled={successfulConversions.length === 0}
                       />
@@ -136,11 +143,25 @@ export function ConversionResultStep({ results, onDone }: ConversionResultStepPr
                           ) : (
                             <XCircle className="h-4 w-4 text-destructive" />
                           )}
-                          <span>{result.inputFile.name}</span>
+                          <span
+                            className="cursor-pointer hover:underline"
+                            onClick={(e) => handlePreview(e, result.inputFile, result.inputFile.name)}
+                          >
+                                {result.inputFile.name}
+                          </span>
                        </div>
                     </TableCell>
                     <TableCell>
-                        {result.status === 'success' ? getOutputFilename(result.inputFile, result.outputFileType) : <span className="text-muted-foreground italic">Failed</span>}
+                        {result.status === 'success' ? (
+                             <span
+                                className="cursor-pointer hover:underline"
+                                onClick={(e) => handlePreview(e, result.outputBlob!, getOutputFilename(result.inputFile, result.outputFileType))}
+                            >
+                                {getOutputFilename(result.inputFile, result.outputFileType)}
+                            </span>
+                        ) : (
+                             <span className="text-muted-foreground italic">Failed</span>
+                        )}
                     </TableCell>
                     </TableRow>
                 ))}

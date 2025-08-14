@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowRight, Trash2, ArrowLeft } from 'lucide-react';
 import { getFileExtension, getFileTypeFromMime, supportedConversions, OutputFormat } from '@/lib/conversions';
 import { getFileIcon } from '@/lib/icons';
+import { usePreview } from '@/context/preview-provider';
 
 interface FileConfigStepProps {
   files: ConversionResult[];
@@ -28,6 +29,7 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
       };
     })
   );
+  const { showPreview } = usePreview();
 
   useEffect(() => {
     if (tasks.length === 0) {
@@ -42,24 +44,17 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
   const handleRemoveTask = (id: string) => {
       setTasks(tasks.filter(task => task.id !== id));
   }
+  
+  const handlePreview = (e: React.MouseEvent, file: File) => {
+    e.preventDefault();
+    showPreview(file, file.name);
+  };
+
 
   const isNextDisabled = useMemo(() => {
     if(tasks.length === 0) return true;
     return tasks.some(task => !task.outputFileType);
   }, [tasks]);
-  
-  // This part is no longer needed as the useEffect handles it automatically.
-  // if (tasks.length === 0) {
-  //   return (
-  //       <div className="text-center p-12 bg-muted/50 rounded-lg">
-  //           <p className="text-muted-foreground mb-4">All files have been removed.</p>
-  //            <Button variant="outline" onClick={onBack}>
-  //               <ArrowLeft className="mr-2 h-4 w-4" />
-  //               Go Back to Upload
-  //           </Button>
-  //       </div>
-  //   )
-  // }
 
   return (
     <div className="space-y-6">
@@ -87,7 +82,14 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
                             {getFileIcon(task.inputFile.name, task.inputFile.type)}
                         </div>
                     </TableCell>
-                    <TableCell className="font-medium truncate max-w-xs">{task.inputFile.name}</TableCell>
+                    <TableCell className="font-medium truncate max-w-xs">
+                        <span 
+                            className="cursor-pointer hover:underline" 
+                            onClick={(e) => handlePreview(e, task.inputFile)}
+                        >
+                            {task.inputFile.name}
+                        </span>
+                    </TableCell>
                     <TableCell>{(task.inputFile.size / 1024).toFixed(2)} KB</TableCell>
                     <TableCell>
                     <Select

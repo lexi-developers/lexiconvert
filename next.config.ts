@@ -26,6 +26,8 @@ const nextConfig: NextConfig = {
         contextRegExp: /jsdom$/,
       })
     );
+    // Setting an alias for pdfjs-dist to avoid server-side issues
+    config.resolve.alias['pdfjs-dist'] = 'pdfjs-dist/build/pdf';
     return config;
   },
 };

@@ -1,0 +1,21 @@
+diff --git a/node_modules/pdfjs-dist/types/web/pdf_viewer.d.ts b/node_modules/pdfjs-dist/types/web/pdf_viewer.d.ts
+index 5aa3215..2157a87 100644
+--- a/node_modules/pdfjs-dist/types/web/pdf_viewer.d.ts
++++ b/node_modules/pdfjs-dist/types/web/pdf_viewer.d.ts
+@@ -1,5 +1,6 @@
+ export * from "./pdf_find_controller.js";
+ export * from "./pdf_link_service.js";
++export * from "./event_utils.js";
+ export { PDFViewer, PDFFindController, PDFLinkService, PDFSidebar, PDFThumbnailViewer, PDFPresentationMode, PDFCursorTools, PDFSidebarResizer, PDFThumbnailView, PDFViewerApplication, AppOptions, SecondaryToolbar, PasswordPrompt, PDFDocumentProperties, Toolbar, ViewerPreferences };
+ import { PDFViewer } from "./pdf_viewer.js";
+ import { PDFFindController } from "./pdf_find_controller.js";
+diff --git a/node_modules/pdfjs-dist/types/web/ui_utils.d.ts b/node_modules/pdfjs-dist/types/web/ui_utils.d.ts
+index c691357..f039aa7 100644
+--- a/node_modules/pdfjs-dist/types/web/ui_utils.d.ts
++++ b/node_modules/pdfjs-dist/types/web/ui_utils.d.ts
+@@ -1,3 +1,4 @@
+ export * from "./event_utils.js";
++export * from "./annotation_layer_builder.js";
+ export { getGlobalEventBus, ProgressBar, RenderingStates, ScrollMode, SpreadMode, TextLayerBuilder, NullL10n, EventBus };
+ declare const getGlobalEventBus: any;
+ declare class ProgressBar {
