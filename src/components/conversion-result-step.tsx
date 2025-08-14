@@ -1,3 +1,4 @@
+
 "use client";
 
 import { ConversionResult } from "@/app/page";
@@ -72,7 +73,6 @@ export function ConversionResultStep({ results, onDone }: ConversionResultStepPr
                     <TableHead>原始檔名</TableHead>
                     <TableHead>轉換後檔名</TableHead>
                     <TableHead>狀態</TableHead>
-                    <TableHead className="text-right">操作</TableHead>
                 </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -92,13 +92,6 @@ export function ConversionResultStep({ results, onDone }: ConversionResultStepPr
                             <span className="flex items-center text-green-600"><CheckCircle className="mr-1 h-4 w-4" /> 成功</span>
                         ) : (
                             <span className="flex items-center text-destructive"><XCircle className="mr-1 h-4 w-4" /> 失敗</span>
-                        )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                        {result.status === 'success' && (
-                            <Button variant="ghost" size="sm" onClick={() => handleDownload(result.outputBlob, getOutputFilename(result.inputFile, result.outputFileType))}>
-                                <Download className="h-4 w-4" />
-                            </Button>
                         )}
                     </TableCell>
                     </TableRow>
