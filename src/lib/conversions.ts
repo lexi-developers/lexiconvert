@@ -5,7 +5,7 @@ import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 import { Potrace } from 'potrace';
 import * as pdfjsLib from 'pdfjs-dist';
-import { Toast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 
 // For Next.js, set the worker source
 if (typeof window !== 'undefined') {
@@ -145,9 +145,7 @@ export const getFileTypeFromMime = (mime: string, extension: string): FileType =
 const mockApiCall = (file: File, outputFormat: string, toast: (options:any) => void): Promise<Blob> => {
     return new Promise((resolve, reject) => {
         toast({
-            title: "Simulating Backend Conversion",
-            description: `This is a placeholder. In a real app, '${file.name}' would be uploaded and converted to ${outputFormat} on a server.`,
-            duration: 5000
+            description: `This is a placeholder. In a real app, '${file.name}' would be uploaded and converted to ${outputFormat} on a server.`
         });
         setTimeout(() => {
             // Simulate a successful conversion by creating a dummy file
@@ -217,7 +215,7 @@ const convertEpubToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
     return new Blob([pdfBytes], { type: "application/pdf" });
 };
 
-const convertDocxToPdf = async (arrayBuffer: ArrayBuffer, toast: (options: { title: string; description: string; }) => void): Promise<Blob> => {
+const convertDocxToPdf = async (arrayBuffer: ArrayBuffer, toast: (options: { description: string; }) => void): Promise<Blob> => {
     const zip = await JSZip.loadAsync(arrayBuffer);
     const content = await zip.file("word/document.xml")?.async("string");
     
@@ -233,20 +231,20 @@ const convertDocxToPdf = async (arrayBuffer: ArrayBuffer, toast: (options: { tit
         textContent = text.join('\n');
     }
     
-    toast({ title: "DOCX Conversion Limitation", description: "Only plain text is extracted. All styling and images are lost." });
+    toast({ description: "DOCX Conversion Limitation: Only plain text is extracted. All styling and images are lost." });
     const pdfDoc = await PDFDocument.create();
     await drawTextInPdf(pdfDoc, textContent);
     const pdfBytes = await pdfDoc.save();
     return new Blob([pdfBytes], { type: "application/pdf" });
 }
 
-const convertXlsxToPdf = async (arrayBuffer: ArrayBuffer, toast: (options: { title: string; description: string; }) => void): Promise<Blob> => {
+const convertXlsxToPdf = async (arrayBuffer: ArrayBuffer, toast: (options: { description: string; }) => void): Promise<Blob> => {
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
     const data = XLSX.utils.sheet_to_csv(worksheet);
     
-    toast({ title: "XLSX Conversion Limitation", description: "Only data from the first sheet is converted to plain text. All styling, charts, and formulas are lost." });
+    toast({ description: "XLSX Conversion Limitation: Only data from the first sheet is converted to plain text. All styling, charts, and formulas are lost." });
     const pdfDoc = await PDFDocument.create();
     await drawTextInPdf(pdfDoc, data);
     const pdfBytes = await pdfDoc.save();
@@ -289,7 +287,7 @@ const convertPdfToImages = async (
         throw new Error("The PDF file has no pages.");
     }
 
-    toast({ title: "Starting PDF Conversion", description: `Converting ${numPages} page(s) to ${outputFormat.toUpperCase()}...` });
+    toast({ description: `Converting ${numPages} page(s) to ${outputFormat.toUpperCase()}...` });
     
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -322,7 +320,7 @@ const convertPdfToImages = async (
             zip.file(`page_${i}.${outputFormat}`, blob);
         }
         canvas.remove();
-        toast({ title: "Compressing...", description: "Compressing all images into a ZIP file." });
+        toast({ description: "Compressing all images into a ZIP file." });
         const zipBlob = await zip.generateAsync({ type: "blob" });
         return { blob: zipBlob, isZip: true };
     }
@@ -420,9 +418,9 @@ const convertToPng = async (arrayBuffer: ArrayBuffer, sourceType: FileType): Pro
   return blob.arrayBuffer();
 }
 
-const convertToSvg = (buffer: Buffer, toast: (options: { title: string; description: string; }) => void): Promise<Blob> => {
+const convertToSvg = (buffer: Buffer, toast: (options: { description: string; }) => void): Promise<Blob> => {
     return new Promise((resolve, reject) => {
-        toast({ title: "Image to SVG Limitation", description: "This is an experimental feature. Conversion may not work well for complex images." });
+        toast({ description: "Image to SVG Limitation: This is an experimental feature. Conversion may not work well for complex images." });
         const potrace = new Potrace();
         potrace.setParameters({
             threshold: 128,

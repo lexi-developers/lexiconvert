@@ -40,7 +40,7 @@ export function LockScreen({ onUnlock }: LockScreenProps) {
         if (isCorrect) {
             onUnlock();
         } else {
-            toast({ title: "Error", description: "Incorrect password.", variant: "destructive" });
+            toast({ description: "Incorrect password.", variant: "destructive" });
             // The hook handles failed attempts, so we just need to re-render to show new state
             setInputPassword('');
         }

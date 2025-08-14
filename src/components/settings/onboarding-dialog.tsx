@@ -39,7 +39,7 @@ export function OnboardingDialog({ onComplete }: OnboardingDialogProps) {
 
     const handleSetPassword = () => {
         if (tempPassword !== confirmPassword) {
-            toast({ title: "Error", description: "Passwords do not match.", variant: "destructive" });
+            toast({ description: "Passwords do not match.", variant: "destructive" });
             return;
         }
         if (tempPassword.length > 0) {

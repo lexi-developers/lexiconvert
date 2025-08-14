@@ -1,3 +1,4 @@
+
 "use client"
 
 // Inspired by react-hot-toast library
@@ -9,11 +10,10 @@ import type {
 } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 5000 // Display for 5 seconds
 
 type ToasterToast = ToastProps & {
   id: string
-  title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
 }
@@ -163,6 +163,10 @@ function toast({ ...props }: Toast) {
       },
     },
   })
+  
+  setTimeout(() => {
+    dismiss()
+  }, TOAST_REMOVE_DELAY - 500) // Start dismiss animation slightly before removal
 
   return {
     id: id,

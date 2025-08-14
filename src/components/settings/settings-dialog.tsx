@@ -55,23 +55,23 @@ export function SettingsDialog({ isOpen, onOpenChange, onHistoryCleared }: Setti
     // This is now handled by the password manager's resetAllData
     // We keep this for non-password data clearing.
     onHistoryCleared();
-    toast({ title: "Success", description: "All conversion history has been deleted." });
+    toast({ description: "All conversion history has been deleted." });
     setIsClearHistoryAlertOpen(false);
   }
 
   const handleSetNewPassword = () => {
     if (newPassword !== confirmPassword) {
-      toast({ title: "Error", description: "Passwords do not match.", variant: "destructive" });
+      toast({ description: "Passwords do not match.", variant: "destructive" });
       return;
     }
      if (newPassword.length === 0) {
-      toast({ title: "Error", description: "Password cannot be empty.", variant: "destructive" });
+      toast({ description: "Password cannot be empty.", variant: "destructive" });
       return;
     }
     setPassword(newPassword);
     setNewPassword('');
     setConfirmPassword('');
-    toast({ title: "Success", description: "Password has been set." });
+    toast({ description: "Password has been set." });
   }
 
   const handleRemovePassword = () => {
@@ -79,9 +79,9 @@ export function SettingsDialog({ isOpen, onOpenChange, onHistoryCleared }: Setti
     if (isCorrect) {
         removePassword();
         setCurrentPassword('');
-        toast({ title: "Success", description: "Password has been removed." });
+        toast({ description: "Password has been removed." });
     } else {
-        toast({ title: "Error", description: "Incorrect password.", variant: "destructive" });
+        toast({ description: "Incorrect password.", variant: "destructive" });
     }
   }
   
