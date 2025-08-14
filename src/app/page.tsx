@@ -40,17 +40,17 @@ export default function Home() {
       <div className="w-full max-w-5xl">
         <header className="flex justify-between items-center mb-8">
           <div className="text-left">
-            <h1 className="text-4xl sm:text-5xl font-bold font-headline text-primary">
+            <h1 className="text-4xl sm:text-5xl font-bold font-headline">
               LexiConvert
             </h1>
             <p className="text-muted-foreground mt-2 text-lg">
-              您的離線檔案轉換工具，安全可靠。
+              A simple, secure, and offline file conversion tool.
             </p>
           </div>
           {view === "history" && (
             <Button size="lg" onClick={() => setView("conversion")}>
               <Plus className="mr-2 h-5 w-5" />
-              新增轉換
+              New Conversion
             </Button>
           )}
         </header>

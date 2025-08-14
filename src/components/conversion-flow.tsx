@@ -65,7 +65,7 @@ export function ConversionFlow({ onComplete, onDone }: ConversionFlowProps) {
     <div className="w-full">
         {step !== 'upload' && (
             <div className="mb-4">
-                <Button variant="outline" onClick={handleCancel}>返回歷史記錄</Button>
+                <Button variant="outline" onClick={handleCancel}>Back to History</Button>
             </div>
         )}
       {step === "upload" && <FileUploadStep onFilesSelected={handleFilesSelected} />}

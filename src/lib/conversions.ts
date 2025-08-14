@@ -165,7 +165,7 @@ const convertDocxToPdf = async (arrayBuffer: ArrayBuffer, toast: (options: { tit
     const zip = await JSZip.loadAsync(arrayBuffer);
     const content = await zip.file("word/document.xml")?.async("string");
     
-    let textContent = "無法讀取 DOCX 內容。這是一個實驗性功能。";
+    let textContent = "Could not read DOCX content. This is an experimental feature.";
     if (content) {
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(content, "application/xml");
@@ -177,7 +177,7 @@ const convertDocxToPdf = async (arrayBuffer: ArrayBuffer, toast: (options: { tit
         textContent = text.join('\n');
     }
     
-    toast({ title: "DOCX 轉換限制", description: "僅提取純文字，所有樣式和圖片均會遺失。" });
+    toast({ title: "DOCX Conversion Limitation", description: "Only plain text is extracted. All styling and images are lost." });
     const pdfDoc = await PDFDocument.create();
     await drawTextInPdf(pdfDoc, textContent);
     const pdfBytes = await pdfDoc.save();
@@ -190,7 +190,7 @@ const convertXlsxToPdf = async (arrayBuffer: ArrayBuffer, toast: (options: { tit
     const worksheet = workbook.Sheets[firstSheetName];
     const data = XLSX.utils.sheet_to_csv(worksheet);
     
-    toast({ title: "XLSX 轉換限制", description: "僅轉換第一張工作表的數據為純文字，所有樣式、圖表和公式均會遺失。" });
+    toast({ title: "XLSX Conversion Limitation", description: "Only data from the first sheet is converted to plain text. All styling, charts, and formulas are lost." });
     const pdfDoc = await PDFDocument.create();
     await drawTextInPdf(pdfDoc, data);
     const pdfBytes = await pdfDoc.save();
@@ -230,14 +230,14 @@ const convertPdfToImages = async (
     const numPages = pdf.numPages;
 
     if (numPages === 0) {
-        throw new Error("PDF 檔案沒有任何頁面。");
+        throw new Error("The PDF file has no pages.");
     }
 
-    toast({ title: "開始轉換 PDF", description: `正在將 ${numPages} 個頁面轉換為 ${outputFormat.toUpperCase()} 圖片...` });
+    toast({ title: "Starting PDF Conversion", description: `Converting ${numPages} page(s) to ${outputFormat.toUpperCase()}...` });
     
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error("無法建立 Canvas Context");
+    if (!ctx) throw new Error("Could not create Canvas Context");
     
     const renderPage = async (pageNumber: number): Promise<Blob> => {
         const page = await pdf.getPage(pageNumber);
@@ -250,7 +250,7 @@ const convertPdfToImages = async (
 
         const mimeType = `image/${outputFormat === 'jpg' ? 'jpeg' : outputFormat}`;
         const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, mimeType, 0.95));
-        if (!blob) throw new Error(`無法將頁面 ${pageNumber} 轉換為圖片`);
+        if (!blob) throw new Error(`Failed to convert page ${pageNumber} to image`);
         page.cleanup();
         return blob;
     };
@@ -266,7 +266,7 @@ const convertPdfToImages = async (
             zip.file(`page_${i}.${outputFormat}`, blob);
         }
         canvas.remove();
-        toast({ title: "壓縮中...", description: "正在將所有圖片壓縮成 ZIP 檔案。" });
+        toast({ title: "Compressing...", description: "Compressing all images into a ZIP file." });
         const zipBlob = await zip.generateAsync({ type: "blob" });
         return { blob: zipBlob, isZip: true };
     }
@@ -276,7 +276,7 @@ const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targ
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    if (!ctx) return reject(new Error('無法取得 Canvas context'));
+    if (!ctx) return reject(new Error('Could not get Canvas context'));
 
     const img = new Image();
     img.onload = () => {
@@ -285,11 +285,11 @@ const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targ
       ctx.drawImage(img, 0, 0);
       const targetMimeType = `image/${targetFormat === 'jpg' ? 'jpeg' : targetFormat}`;
       canvas.toBlob((blob) => {
-        if (!blob) return reject(new Error('Canvas to Blob 轉換失敗'));
+        if (!blob) return reject(new Error('Canvas to Blob conversion failed'));
         resolve(blob);
       }, targetMimeType, 0.95);
     };
-    img.onerror = () => reject(new Error('圖片載入失敗。檔案可能已損毀或格式不支援。'));
+    img.onerror = () => reject(new Error('Image failed to load. The file may be corrupt or in an unsupported format.'));
 
     let srcUrl: string;
     const sourceMime = Object.keys(mimeTypeToType).find(key => mimeTypeToType[key] === sourceType);
@@ -318,7 +318,7 @@ const convertToPng = async (arrayBuffer: ArrayBuffer, sourceType: FileType): Pro
 
 const convertToSvg = (buffer: Buffer, toast: (options: { title: string; description: string; }) => void): Promise<Blob> => {
     return new Promise((resolve, reject) => {
-        toast({ title: "圖片轉 SVG 限制", description: "此為實驗性功能，複雜圖片轉換效果可能不佳。" });
+        toast({ title: "Image to SVG Limitation", description: "This is an experimental feature. Conversion may not work well for complex images." });
         const potrace = new Potrace();
         potrace.setParameters({
             threshold: 128,
@@ -369,7 +369,7 @@ export const performConversion = async (file: File, fileType: FileType, outputFo
             const buffer = Buffer.from(arrayBuffer);
             blob = await convertToSvg(buffer, toast);
         } else {
-            throw new Error("僅支援圖片格式轉為 SVG。");
+            throw new Error("Only image formats can be converted to SVG.");
         }
     }
     else {

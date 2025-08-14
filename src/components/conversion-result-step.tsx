@@ -61,18 +61,18 @@ export function ConversionResultStep({ results, onDone }: ConversionResultStepPr
     <div className="space-y-6">
         <div className="text-center">
             <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
-            <h2 className="mt-4 text-2xl font-semibold">轉換完成！</h2>
-            <p className="mt-1 text-muted-foreground">您的檔案已成功轉換。</p>
+            <h2 className="mt-4 text-2xl font-semibold">Conversion Complete!</h2>
+            <p className="mt-1 text-muted-foreground">Your files have been successfully converted.</p>
         </div>
         
         <div className="border rounded-lg">
             <Table>
                 <TableHeader>
                 <TableRow>
-                    <TableHead className="w-[50px]">類型</TableHead>
-                    <TableHead>原始檔名</TableHead>
-                    <TableHead>轉換後檔名</TableHead>
-                    <TableHead>狀態</TableHead>
+                    <TableHead className="w-[50px]">Type</TableHead>
+                    <TableHead>Original Filename</TableHead>
+                    <TableHead>Converted Filename</TableHead>
+                    <TableHead>Status</TableHead>
                 </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -89,9 +89,9 @@ export function ConversionResultStep({ results, onDone }: ConversionResultStepPr
                     </TableCell>
                     <TableCell>
                         {result.status === 'success' ? (
-                            <span className="flex items-center text-green-600"><CheckCircle className="mr-1 h-4 w-4" /> 成功</span>
+                            <span className="flex items-center text-green-600"><CheckCircle className="mr-1 h-4 w-4" /> Success</span>
                         ) : (
-                            <span className="flex items-center text-destructive"><XCircle className="mr-1 h-4 w-4" /> 失敗</span>
+                            <span className="flex items-center text-destructive"><XCircle className="mr-1 h-4 w-4" /> Failed</span>
                         )}
                     </TableCell>
                     </TableRow>
@@ -102,18 +102,18 @@ export function ConversionResultStep({ results, onDone }: ConversionResultStepPr
 
         <div className="flex justify-between items-center">
              <Button variant="outline" onClick={onDone}>
-                完成
+                Done
              </Button>
 
             {successfulConversions.length > 1 && (
                  <div className="flex gap-2">
                     <Button onClick={handleDownloadAllIndividually}>
                         <Download className="mr-2 h-4 w-4" />
-                        全部下載
+                        Download All
                     </Button>
                     <Button onClick={handleDownloadAllAsZip}>
                         <FileArchive className="mr-2 h-4 w-4" />
-                        下載 ZIP 壓縮檔
+                        Download as ZIP
                     </Button>
                  </div>
             )}
@@ -121,7 +121,7 @@ export function ConversionResultStep({ results, onDone }: ConversionResultStepPr
              {successfulConversions.length === 1 && (
                  <Button onClick={() => handleDownload(successfulConversions[0].outputBlob, getOutputFilename(successfulConversions[0].inputFile, successfulConversions[0].outputFileType))}>
                     <Download className="mr-2 h-4 w-4" />
-                    下載檔案
+                    Download File
                  </Button>
             )}
         </div>

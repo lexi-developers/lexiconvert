@@ -44,15 +44,15 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
 
   return (
     <div className="space-y-6">
-       <h2 className="text-2xl font-semibold">設定轉換選項</h2>
+       <h2 className="text-2xl font-semibold">Configure Conversion Options</h2>
        <div className="border rounded-lg">
         <Table>
             <TableHeader>
             <TableRow>
-                <TableHead className="w-[50px]">類型</TableHead>
-                <TableHead>檔名</TableHead>
-                <TableHead>大小</TableHead>
-                <TableHead className="w-[200px]">轉換為</TableHead>
+                <TableHead className="w-[50px]">Type</TableHead>
+                <TableHead>Filename</TableHead>
+                <TableHead>Size</TableHead>
+                <TableHead className="w-[200px]">Convert To</TableHead>
                 <TableHead className="w-[50px] text-right"></TableHead>
             </TableRow>
             </TableHeader>
@@ -77,7 +77,7 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
                         disabled={availableFormats.length === 0}
                     >
                         <SelectTrigger>
-                        <SelectValue placeholder="選擇格式" />
+                        <SelectValue placeholder="Select format" />
                         </SelectTrigger>
                         <SelectContent>
                         {availableFormats.length > 0 ? (
@@ -85,7 +85,7 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
                             <SelectItem key={format} value={format}>{format.toUpperCase()}</SelectItem>
                             ))
                         ) : (
-                            <SelectItem value="none" disabled>無可用格式</SelectItem>
+                            <SelectItem value="none" disabled>No formats available</SelectItem>
                         )}
                         </SelectContent>
                     </Select>
@@ -102,7 +102,7 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
         </Table>
         {tasks.length === 0 && (
             <div className="text-center p-8">
-                <p className="text-muted-foreground">所有檔案都已移除。請返回上一步重新上傳。</p>
+                <p className="text-muted-foreground">All files have been removed. Go back to re-upload.</p>
             </div>
         )}
       </div>
@@ -110,10 +110,10 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
       <div className="flex justify-between items-center">
         <Button variant="outline" onClick={onBack}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          返回上傳
+          Back to Upload
         </Button>
         <Button size="lg" onClick={() => onConfigComplete(tasks)} disabled={isNextDisabled}>
-          開始轉換
+          Start Conversion
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>

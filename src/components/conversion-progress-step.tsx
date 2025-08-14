@@ -28,7 +28,7 @@ export function ConversionProgressStep({ tasks, onConversionComplete }: Conversi
         const startTime = Date.now();
         try {
           if (!task.outputFileType) {
-              throw new Error("未指定輸出格式");
+              throw new Error("Output format was not specified");
           }
           const extension = getFileExtension(task.inputFile.name);
           const type = getFileTypeFromMime(task.inputFile.type, extension);
@@ -47,7 +47,7 @@ export function ConversionProgressStep({ tasks, onConversionComplete }: Conversi
           result = {
             ...task,
             status: 'error',
-            error: error.message || '未知錯誤',
+            error: error.message || 'An unknown error occurred',
             conversionTime: Date.now() - startTime,
           };
         }
@@ -66,20 +66,20 @@ export function ConversionProgressStep({ tasks, onConversionComplete }: Conversi
   return (
     <div className="space-y-8 flex flex-col items-center justify-center p-12 bg-muted/50 rounded-lg">
         <div className="flex items-center gap-4 text-2xl font-semibold">
-            <Loader className="animate-spin h-8 w-8 text-primary" />
-            <p>正在轉換檔案...</p>
+            <Loader className="animate-spin h-8 w-8" />
+            <p>Converting files...</p>
         </div>
         
         <div className="w-full max-w-lg space-y-4">
             <Progress value={progress} />
             <div className="text-center text-muted-foreground">
-                <p>總進度: {Math.round(progress)}%</p>
-                {currentTask && <p>正在處理: {currentTask.inputFile.name}</p>}
+                <p>Overall Progress: {Math.round(progress)}%</p>
+                {currentTask && <p>Processing: {currentTask.inputFile.name}</p>}
             </div>
         </div>
 
         <div className="w-full max-w-lg space-y-2">
-            <h3 className="font-semibold text-center">轉換詳情</h3>
+            <h3 className="font-semibold text-center">Conversion Details</h3>
             <ul className="max-h-48 overflow-y-auto bg-background p-2 rounded-md border">
                 {results.map(res => (
                     <li key={res.id} className="flex items-center justify-between text-sm p-1">

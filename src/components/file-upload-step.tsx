@@ -46,18 +46,18 @@ export function FileUploadStep({ onFilesSelected }: FileUploadStepProps) {
       onDrop={(e) => handleDragEvents(e, 'drop')}
     >
       <UploadCloud className="w-16 h-16 text-muted-foreground" />
-      <h2 className="mt-6 text-2xl font-semibold">拖放檔案或資料夾到此處</h2>
+      <h2 className="mt-6 text-2xl font-semibold">Drag & drop files or folders here</h2>
       <p className="mt-2 text-muted-foreground">
-        或點擊按鈕選擇
+        or click a button to select
       </p>
       <div className="mt-6 flex gap-4">
         <Button size="lg" onClick={() => fileInputRef.current?.click()}>
           <UploadCloud className="mr-2 h-5 w-5" />
-          選擇檔案
+          Select Files
         </Button>
         <Button size="lg" variant="secondary" onClick={() => folderInputRef.current?.click()}>
            <FolderUp className="mr-2 h-5 w-5" />
-          選擇資料夾
+          Select Folder
         </Button>
       </div>
       <input
@@ -76,7 +76,7 @@ export function FileUploadStep({ onFilesSelected }: FileUploadStepProps) {
         directory="true"
         onChange={handleFileChange}
       />
-       <p className="text-xs text-muted-foreground mt-6">支援 PDF, DOCX, XLSX, TXT, EPUB, 圖片, 程式碼等多種格式</p>
+       <p className="text-xs text-muted-foreground mt-6">Supports PDF, DOCX, XLSX, TXT, EPUB, Images, Code, and more.</p>
     </div>
   );
 }

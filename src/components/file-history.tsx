@@ -22,9 +22,9 @@ export function FileHistory({ history }: FileHistoryProps) {
     return (
       <div className="text-center py-20 bg-muted/50 rounded-lg">
         <File className="mx-auto h-12 w-12 text-muted-foreground" />
-        <h3 className="mt-4 text-lg font-medium">尚無轉換記錄</h3>
+        <h3 className="mt-4 text-lg font-medium">No Conversion History</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          點擊右上角的「新增轉換」開始您的第一次檔案轉換。
+          Click "New Conversion" in the top right to start your first file conversion.
         </p>
       </div>
     );
@@ -44,9 +44,9 @@ export function FileHistory({ history }: FileHistoryProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[50px]">類型</TableHead>
-            <TableHead>檔名</TableHead>
-            <TableHead>轉換時間</TableHead>
+            <TableHead className="w-[50px]">Type</TableHead>
+            <TableHead>Filename</TableHead>
+            <TableHead>Conversion Time</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
