@@ -1,11 +1,17 @@
 # LexiConvert
 
 <p align="center">
+  <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-blue.svg">
+</p>
+
+<p align="center">
   <img src="https://placehold.co/600x300.png" alt="LexiConvert Banner" data-ai-hint="abstract document conversion" />
 </p>
 
 <p align="center">
   <strong>A powerful, privacy-first, modern file conversion tool that runs entirely in your browser—no internet connection required.</strong>
+  <br />
+  LexiConvert is permanently free for both personal and commercial use.
 </p>
 
 ---
