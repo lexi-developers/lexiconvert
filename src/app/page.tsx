@@ -84,7 +84,7 @@ export default function Home() {
 
       </div>
        <Dialog open={isConversionFlowOpen} onOpenChange={setIsConversionFlowOpen}>
-          <DialogContent className="max-w-4xl w-full h-full sm:h-[90vh] flex flex-col p-0 rounded-lg">
+          <DialogContent className="max-w-4xl w-full h-full sm:h-[90vh] flex flex-col p-0">
               <ConversionFlow onDone={handleFlowDone} />
           </DialogContent>
        </Dialog>

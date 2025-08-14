@@ -2,7 +2,6 @@
 "use client";
 
 import { useState } from "react";
-import { useDialog } from "@/hooks/use-dialog";
 import { ConversionResult } from "@/app/page";
 import { FileUploadStep } from "./file-upload-step";
 import { FileConfigStep } from "./file-config-step";
@@ -73,13 +72,14 @@ export function ConversionFlow({ onDone }: ConversionFlowProps) {
   }
 
   const handleCloseRequest = () => {
-    // Don't show confirmation on the final step
-    if (step === 'result' || step === 'upload') {
+    // If we're on the first step or the last step, close immediately.
+    // Otherwise, ask for confirmation.
+    if (step === 'upload' || step === 'result' || filesToConvert.length === 0) {
         onDone([]); // Pass empty array to signify cancellation
         handleReset();
-        return;
+    } else {
+        setIsCancelAlertOpen(true);
     }
-    setIsCancelAlertOpen(true);
   }
 
   const handleConfirmCancel = () => {
@@ -97,7 +97,6 @@ export function ConversionFlow({ onDone }: ConversionFlowProps) {
         default: return "LexiConvert";
     }
   }
-
 
   const renderStep = () => {
     switch(step) {
