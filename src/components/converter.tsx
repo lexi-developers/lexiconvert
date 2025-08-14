@@ -12,6 +12,7 @@ import {
   Loader,
   Image as ImageIcon,
   FileSymlink,
+  Book,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -32,12 +33,12 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-
+import ePub from "epubjs";
 
 // === TYPES AND CONSTANTS ===
 
 type ConversionStatus = "idle" | "converting" | "success" | "error";
-type DocumentFileType = "docx" | "txt";
+type DocumentFileType = "docx" | "txt" | "epub";
 type ImageFileType = "jpg" | "png" | "gif" | "bmp" | "webp" | "svg";
 type FileType = DocumentFileType | ImageFileType | "unknown";
 type OutputFormat = "pdf" | "jpg" | "png" | "webp" | "gif" | "bmp";
@@ -46,6 +47,7 @@ const mimeTypeToType: Record<string, FileType> = {
   // Documents
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
   "text/plain": "txt",
+  "application/epub+zip": "epub",
   // Images
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -58,6 +60,7 @@ const mimeTypeToType: Record<string, FileType> = {
 const supportedConversions: Record<FileType, OutputFormat[]> = {
   docx: ["pdf"],
   txt: ["pdf"],
+  epub: ["pdf"],
   jpg: ["pdf", "png", "webp", "gif", "bmp"],
   png: ["pdf", "jpg", "webp", "gif", "bmp"],
   gif: ["pdf", "jpg", "png", "webp", "bmp"],
@@ -78,6 +81,7 @@ const getFileTypeFromMime = (mime: string, extension: string): FileType => {
     // Fallback for types not correctly reported by browser
     if (extension === 'jpg' || extension === 'jpeg') return 'jpg';
     if (extension === 'png') return 'png';
+    if (extension === 'epub') return 'epub';
     // Add other extension fallbacks if needed
     return "unknown";
 }
@@ -161,9 +165,72 @@ export function Converter() {
   };
 
   // === CONVERSION LOGIC ===
+  
+  const convertEpubToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
+    const book = ePub(arrayBuffer);
+    await book.ready;
+  
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontSize = 12;
+    const { width, height } = pdfDoc.addPage().getSize();
+    const margin = 50;
+    const maxTextWidth = width - 2 * margin;
+  
+    let currentPage = pdfDoc.getPage(0);
+    let y = height - margin;
+  
+    const addPageIfNeeded = () => {
+      if (y < margin) {
+        currentPage = pdfDoc.addPage();
+        y = height - margin;
+      }
+    };
+  
+    // Simplified content extraction
+    for (const item of book.spine.items) {
+      const doc = await item.load(book.load.bind(book));
+      const body = doc.querySelector('body');
+      if (body) {
+         // Create a temporary div to render HTML and extract text
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = body.innerHTML;
+
+        // Naive text extraction
+        const textContent = tempDiv.innerText || '';
+        const lines = textContent.split('\n');
+
+        for (const line of lines) {
+           // This is a very basic way to wrap text. pdf-lib doesn't have auto-wrapping.
+           // For a real app, a more sophisticated text wrapping algorithm is needed.
+           let currentLine = line;
+           while(currentLine.length > 0) {
+             let textFits = currentLine;
+             while(font.widthOfTextAtSize(textFits, fontSize) > maxTextWidth) {
+                textFits = textFits.slice(0, -1);
+             }
+             addPageIfNeeded();
+             currentPage.drawText(textFits, { x: margin, y, font, size: fontSize, color: rgb(0,0,0) });
+             y -= 15; // line height
+             currentLine = currentLine.substring(textFits.length);
+           }
+        }
+        addPageIfNeeded();
+        y -= 20; // paragraph spacing
+      }
+    }
+  
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: "application/pdf" });
+  };
+
 
   const convertToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
     const pdfDoc = await PDFDocument.create();
+
+    if (fileType === 'epub') {
+        return convertEpubToPdf(arrayBuffer);
+    }
 
     if (fileType === "jpg" || fileType === "png" || fileType === "gif" || fileType === "bmp" || fileType === "webp") {
       let image;
@@ -283,6 +350,9 @@ export function Converter() {
     if (['jpg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(fileTypeStr)) {
         return <ImageIcon className="h-4 w-4" />;
     }
+    if (fileTypeStr === 'epub') {
+        return <Book className="h-4 w-4" />;
+    }
     return <FileText className="h-4 w-4" />;
   }
   
@@ -315,7 +385,7 @@ export function Converter() {
             <p className="mt-4 text-center text-muted-foreground">
               <span className="font-semibold text-primary">點擊上傳</span> 或拖放檔案
             </p>
-            <p className="text-xs text-muted-foreground mt-1">支援 DOCX, TXT, JPG, PNG, GIF, BMP, WEBP, SVG</p>
+            <p className="text-xs text-muted-foreground mt-1">支援 DOCX, TXT, EPUB, JPG, PNG, GIF, BMP, WEBP, SVG</p>
             <input
               ref={fileInputRef}
               type="file"
