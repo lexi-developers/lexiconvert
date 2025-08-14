@@ -1,11 +1,12 @@
 
 "use client";
 
+import { useState, useEffect } from "react";
 import { ConversionResult } from "@/app/page";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Download, CheckCircle, XCircle, FileArchive } from "lucide-react";
-import { getFileIcon } from "@/lib/icons";
+import { Checkbox } from "@/components/ui/checkbox";
 import JSZip from 'jszip';
 
 interface ConversionResultStepProps {
@@ -21,6 +22,37 @@ const getOutputFilename = (inputFile: File, outputFileType?: string): string => 
 
 
 export function ConversionResultStep({ results, onDone }: ConversionResultStepProps) {
+  const [selectedResults, setSelectedResults] = useState<Set<string>>(new Set());
+  
+  const successfulConversions = results.filter(r => r.status === 'success');
+
+  // Pre-select all successful conversions on initial render
+  useEffect(() => {
+    setSelectedResults(new Set(successfulConversions.map(r => r.id)));
+  }, [results]); // Dependency on results ensures this runs only when results change
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedResults(new Set(successfulConversions.map(r => r.id)));
+    } else {
+      setSelectedResults(new Set());
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    const newSelection = new Set(selectedResults);
+    if (checked) {
+      newSelection.add(id);
+    } else {
+      newSelection.delete(id);
+    }
+    setSelectedResults(newSelection);
+  };
+
+  const getSelectedResultObjects = () => {
+    return results.filter(r => selectedResults.has(r.id));
+  };
+
 
   const handleDownload = (blob?: Blob, filename?: string) => {
     if (!blob || !filename) return;
@@ -36,7 +68,8 @@ export function ConversionResultStep({ results, onDone }: ConversionResultStepPr
 
   const handleDownloadAllAsZip = async () => {
     const zip = new JSZip();
-    results.forEach(result => {
+    const selected = getSelectedResultObjects();
+    selected.forEach(result => {
       if (result.status === 'success' && result.outputBlob) {
         const filename = getOutputFilename(result.inputFile, result.outputFileType);
         zip.file(filename, result.outputBlob);
@@ -47,7 +80,8 @@ export function ConversionResultStep({ results, onDone }: ConversionResultStepPr
   };
 
   const handleDownloadAllIndividually = () => {
-     results.forEach(result => {
+     const selected = getSelectedResultObjects();
+     selected.forEach(result => {
       if (result.status === 'success' && result.outputBlob) {
         const filename = getOutputFilename(result.inputFile, result.outputFileType);
         handleDownload(result.outputBlob, filename);
@@ -55,44 +89,58 @@ export function ConversionResultStep({ results, onDone }: ConversionResultStepPr
     });
   }
 
-  const successfulConversions = results.filter(r => r.status === 'success');
+  const selectedCount = selectedResults.size;
+  const allSuccessfulSelected = selectedCount === successfulConversions.length && successfulConversions.length > 0;
+  const someSuccessfulSelected = selectedCount > 0 && selectedCount < successfulConversions.length;
+
 
   return (
     <div className="space-y-6">
         <div className="text-center">
             <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
             <h2 className="mt-4 text-2xl font-semibold">Conversion Complete!</h2>
-            <p className="mt-1 text-muted-foreground">Your files have been successfully converted.</p>
+            <p className="mt-1 text-muted-foreground">Select files to download.</p>
         </div>
         
         <div className="border rounded-lg">
             <Table>
                 <TableHeader>
                 <TableRow>
-                    <TableHead className="w-[50px]">Type</TableHead>
+                    <TableHead className="w-[40px]">
+                       <Checkbox
+                        checked={allSuccessfulSelected}
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Select all"
+                        disabled={successfulConversions.length === 0}
+                      />
+                    </TableHead>
                     <TableHead>Original Filename</TableHead>
                     <TableHead>Converted Filename</TableHead>
-                    <TableHead>Status</TableHead>
                 </TableRow>
                 </TableHeader>
                 <TableBody>
                 {results.map(result => (
                     <TableRow key={result.id}>
                     <TableCell>
-                         <div className="w-6 h-6 flex items-center justify-center text-muted-foreground">
-                            {getFileIcon(result.inputFile.name, result.inputFile.type)}
-                         </div>
+                        <Checkbox
+                            checked={selectedResults.has(result.id)}
+                            onCheckedChange={(checked) => handleSelectOne(result.id, checked as boolean)}
+                            aria-label={`Select ${result.inputFile.name}`}
+                            disabled={result.status !== 'success'}
+                         />
                     </TableCell>
-                    <TableCell className="font-medium">{result.inputFile.name}</TableCell>
-                    <TableCell>
-                        {result.status === 'success' ? getOutputFilename(result.inputFile, result.outputFileType) : '-'}
+                    <TableCell className="font-medium">
+                       <div className="flex items-center gap-2">
+                         {result.status === 'success' ? (
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-destructive" />
+                          )}
+                          <span>{result.inputFile.name}</span>
+                       </div>
                     </TableCell>
                     <TableCell>
-                        {result.status === 'success' ? (
-                            <span className="flex items-center text-green-600"><CheckCircle className="mr-1 h-4 w-4" /> Success</span>
-                        ) : (
-                            <span className="flex items-center text-destructive"><XCircle className="mr-1 h-4 w-4" /> Failed</span>
-                        )}
+                        {result.status === 'success' ? getOutputFilename(result.inputFile, result.outputFileType) : <span className="text-muted-foreground italic">Failed</span>}
                     </TableCell>
                     </TableRow>
                 ))}
@@ -105,25 +153,18 @@ export function ConversionResultStep({ results, onDone }: ConversionResultStepPr
                 Done
              </Button>
 
-            {successfulConversions.length > 1 && (
-                 <div className="flex gap-2">
-                    <Button onClick={handleDownloadAllIndividually}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Download All
-                    </Button>
-                    <Button onClick={handleDownloadAllAsZip}>
+            <div className="flex gap-2">
+                {selectedCount > 1 && (
+                    <Button onClick={handleDownloadAllAsZip} disabled={selectedCount === 0}>
                         <FileArchive className="mr-2 h-4 w-4" />
-                        Download as ZIP
+                        Download ZIP ({selectedCount})
                     </Button>
-                 </div>
-            )}
-
-             {successfulConversions.length === 1 && (
-                 <Button onClick={() => handleDownload(successfulConversions[0].outputBlob, getOutputFilename(successfulConversions[0].inputFile, successfulConversions[0].outputFileType))}>
+                )}
+                 <Button onClick={handleDownloadAllIndividually} disabled={selectedCount === 0}>
                     <Download className="mr-2 h-4 w-4" />
-                    Download File
+                    Download Selected ({selectedCount})
                  </Button>
-            )}
+            </div>
         </div>
     </div>
   );
