@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useCallback } from "react";
@@ -46,18 +47,14 @@ export function FileUploadStep({ onFilesSelected }: FileUploadStepProps) {
       onDrop={(e) => handleDragEvents(e, 'drop')}
     >
       <UploadCloud className="w-16 h-16 text-muted-foreground" />
-      <h2 className="mt-6 text-2xl font-semibold">Drag & drop files or folders here</h2>
+      <h2 className="mt-6 text-2xl font-semibold">Drag & drop files here</h2>
       <p className="mt-2 text-muted-foreground">
-        or click a button to select
+        or click the button to select
       </p>
-      <div className="mt-6 flex gap-4">
+      <div className="mt-6">
         <Button size="lg" onClick={() => fileInputRef.current?.click()}>
           <UploadCloud className="mr-2 h-5 w-5" />
           Select Files
-        </Button>
-        <Button size="lg" variant="secondary" onClick={() => folderInputRef.current?.click()}>
-           <FolderUp className="mr-2 h-5 w-5" />
-          Select Folder
         </Button>
       </div>
       <input
@@ -76,7 +73,6 @@ export function FileUploadStep({ onFilesSelected }: FileUploadStepProps) {
         directory="true"
         onChange={handleFileChange}
       />
-       <p className="text-xs text-muted-foreground mt-6">Supports PDF, DOCX, XLSX, TXT, EPUB, Images, Code, and more.</p>
     </div>
   );
 }
