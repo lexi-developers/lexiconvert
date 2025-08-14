@@ -2,7 +2,13 @@
 "use client";
 
 import { createContext, useState, useContext, ReactNode, useCallback } from 'react';
-import { FilePreview } from '@/components/file-preview';
+import dynamic from 'next/dynamic';
+
+// Dynamically import FilePreview with SSR turned off
+const FilePreview = dynamic(() => import('@/components/file-preview').then(mod => mod.FilePreview), {
+  ssr: false,
+});
+
 
 type PreviewContextType = {
   showPreview: (file: File | Blob, fileName: string) => void;
