@@ -50,7 +50,7 @@ export default function Home() {
               LexiConvert
             </h1>
           </div>
-          {view === "history" && (
+          {view === "history" && history.length > 0 && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -68,7 +68,7 @@ export default function Home() {
         </header>
 
         {view === "history" ? (
-          <FileHistory history={history} />
+          <FileHistory history={history} onNewConversion={() => setView("conversion")} />
         ) : (
           <ConversionFlow onComplete={handleConversionComplete} onDone={handleFlowDone} />
         )}

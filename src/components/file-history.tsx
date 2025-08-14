@@ -9,23 +9,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { File } from "lucide-react";
+import { Plus } from "lucide-react";
 import { ConversionResult } from "@/app/page";
 import { getFileIcon } from "@/lib/icons";
+import { Button } from "./ui/button";
 
 interface FileHistoryProps {
   history: ConversionResult[];
+  onNewConversion: () => void;
 }
 
-export function FileHistory({ history }: FileHistoryProps) {
+export function FileHistory({ history, onNewConversion }: FileHistoryProps) {
   if (history.length === 0) {
     return (
-      <div className="text-center py-20 bg-muted/50 rounded-lg">
-        <File className="mx-auto h-12 w-12 text-muted-foreground" />
-        <h3 className="mt-4 text-lg font-medium">No Conversions Yet</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Click the "+" button to start a new conversion.
-        </p>
+      <div className="text-center py-20 bg-muted/20 rounded-lg flex items-center justify-center">
+        <Button 
+          size="lg"
+          variant="outline" 
+          className="rounded-full h-20 w-20" 
+          onClick={onNewConversion}
+        >
+          <Plus className="h-10 w-10" />
+          <span className="sr-only">New Conversion</span>
+        </Button>
       </div>
     );
   }
