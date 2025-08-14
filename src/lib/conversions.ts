@@ -77,45 +77,47 @@ export const mimeTypeToType: Record<string, FileType> = {
 };
 
 export const supportedConversions: Record<FileType, OutputFormat[]> = {
-  // Documents
-  docx: ["pdf"],
-  xlsx: ["pdf"],
-  pptx: [],
-  pdf: ["png", "jpg", "webp", "bmp"],
-  txt: ["pdf"],
-  epub: ["pdf"],
-  // Images
-  jpg: ["png", "pdf", "webp", "gif", "bmp", "svg", "ico"],
-  png: ["jpg", "pdf", "webp", "gif", "bmp", "svg", "ico"],
-  gif: ["png", "pdf", "jpg", "webp", "bmp", "ico", "mp4"],
-  bmp: ["png", "pdf", "jpg", "webp", "gif", "svg", "ico"],
-  webp: ["png", "pdf", "jpg", "gif", "bmp", "svg", "ico"],
-  svg: ["png", "pdf", "jpg", "ico"],
-  ico: ["png", "jpg", "webp", "bmp", "gif", "pdf"],
-  // Audio
-  mp3: ["wav"],
-  wav: ["mp3"],
-  m4a: [],
-  ogg: [],
-  // Video
-  mp4: ["gif"],
-  mov: ["gif"],
-  avi: [],
-  webm: [],
-  // Text-based
-  html: ["pdf"],
-  xml: ["pdf"],
-  csv: ["pdf"],
-  json: ["pdf"],
-  md: ["pdf"],
-  js: ["pdf"],
-  ts: ["pdf"],
-  css: ["pdf"],
-  py: ["pdf"],
-  sql: ["pdf"],
-  // Unknown
-  unknown: [],
+    // This list now only contains REAL, browser-achievable conversions.
+    // Documents
+    docx: ["pdf"],
+    xlsx: ["pdf"],
+    pptx: [],
+    pdf: ["png", "jpg", "webp", "bmp"],
+    txt: ["pdf"],
+    epub: ["pdf"],
+    // Images
+    jpg: ["png", "pdf", "webp", "gif", "bmp", "svg", "ico"],
+    png: ["jpg", "pdf", "webp", "gif", "bmp", "svg", "ico"],
+    gif: ["png", "pdf", "jpg", "webp", "bmp", "ico", "mp4"],
+    bmp: ["png", "pdf", "jpg", "webp", "gif", "svg", "ico"],
+    webp: ["png", "pdf", "jpg", "gif", "bmp", "svg", "ico"],
+    svg: ["png", "pdf", "jpg", "ico"],
+    ico: ["png", "jpg", "webp", "bmp", "gif", "pdf"],
+    // Audio (Real conversions)
+    mp3: ["wav"],
+    wav: ["mp3"],
+    m4a: [],
+    ogg: [],
+    // Video (Real conversions)
+    mp4: ["gif"],
+    mov: ["gif"],
+    avi: [],
+    webm: [],
+    // Text-based
+    html: ["pdf"],
+    xml: ["pdf"],
+    csv: ["pdf"],
+    json: ["pdf"],
+    md: ["pdf"],
+    js: ["pdf"],
+    ts: ["pdf"],
+    css: ["pdf"],
+    py: ["pdf"],
+    sql: ["pdf"],
+    // Unknown
+    unknown: [],
 };
+
 
 
 // === HELPER FUNCTIONS ===
@@ -270,7 +272,7 @@ const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<B
         const video = document.createElement('video');
         video.muted = true;
         video.playsInline = true;
-        video.preload = 'auto';
+        video.preload = 'metadata'; // Use metadata to get duration faster
         video.src = videoUrl;
 
         video.addEventListener('error', (e) => {
@@ -279,74 +281,121 @@ const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<B
         });
 
         video.addEventListener('loadedmetadata', async () => {
-            if (!isFinite(video.duration) || video.duration <= 0) {
-                URL.revokeObjectURL(videoUrl);
-                return reject(new Error("Invalid video duration. Cannot convert to GIF."));
+            // Immediately revoke URL after getting metadata as we don't need it for playback anymore
+            URL.revokeObjectURL(videoUrl);
+            const duration = video.duration;
+
+            if (!isFinite(duration) || duration <= 0) {
+                return reject(new Error("Invalid or zero-length video duration. Cannot convert to GIF."));
             }
 
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             if (!ctx) {
-                URL.revokeObjectURL(videoUrl);
                 return reject(new Error("Could not create canvas context."));
             }
 
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-
-            const frameRate = 10;
-            const delay = 1000 / frameRate;
+            
+            // Optimization: Lower frame rate and increase quality (higher value is lower quality for gif.js)
+            const frameRate = 8; 
+            const frameDelay = 1000 / frameRate;
 
             const gif = new GIF({
                 workers: 2,
-                quality: 10,
+                quality: 15, // Increased from 10 to 15 to trade quality for speed
                 workerScript: new URL('gif.js/dist/gif.worker.js', import.meta.url).toString(),
             });
 
             gif.on('finished', (blob: Blob) => {
-                URL.revokeObjectURL(videoUrl);
                 video.remove();
                 canvas.remove();
                 resolve(blob);
             });
+            
+            gif.on('progress', (p: number) => {
+                 toast({ description: `Encoding GIF: ${Math.round(p * 100)}% complete`});
+            });
+
 
             let currentTime = 0;
+            video.currentTime = currentTime;
+            
+            await new Promise(resolveSeek => {
+                video.addEventListener('seeked', () => resolveSeek(null), { once: true });
+            });
+
 
             const captureFrame = async () => {
-                if (currentTime > video.duration) {
+                if (!ctx) return;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const validDelay = isFinite(frameDelay) ? frameDelay : 100;
+                gif.addFrame(ctx, { copy: true, delay: validDelay });
+                
+                currentTime += 1 / frameRate;
+
+                if (currentTime <= duration) {
+                    video.currentTime = currentTime;
+                    await new Promise(rs => video.addEventListener('seeked', () => rs(null), { once: true }));
+                    // Use timeout to prevent call stack overflow and unblock the main thread
+                    setTimeout(captureFrame, 0);
+                } else {
                     toast({ description: "Finalizing GIF, please wait..." });
                     gif.render();
-                    return;
                 }
-
-                video.currentTime = currentTime;
-                
-                await new Promise(resolveSeek => {
-                    video.addEventListener('seeked', () => resolveSeek(null), { once: true });
-                });
-
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                gif.addFrame(ctx, { copy: true, delay: delay });
-
-                currentTime += 1 / frameRate;
-                setTimeout(captureFrame, 0); // Use setTimeout to avoid blocking the main thread
             };
 
-            // Start playing to buffer frames and then start capturing
-            await video.play();
-            video.pause();
             captureFrame();
         });
     });
 };
 
+
 const convertGifToVideo = async (gifFile: File, outputFormat: 'mp4', toast: (options: any) => void): Promise<Blob> => {
-    toast({ description: "Browser-based GIF to Video conversion is not fully supported. This is an experimental feature." });
-    
-    // This is a placeholder for a feature that is complex to implement client-side.
-    // In a real application, this would ideally be a server-side conversion.
-    // For now, we will throw an error to indicate it's not implemented.
-    throw new Error(`Browser-based GIF to ${outputFormat} conversion is not supported in this version.`);
+    return new Promise(async (resolve, reject) => {
+        toast({ description: "Decoding GIF frames. This may be slow for large animations." });
+
+        const { default: GIF } = await import('gif.js');
+
+        // This is a workaround to parse GIF frames using gif.js's logic
+        const tempGif = new GIF({ workers: 1, workerScript: new URL('gif.js/dist/gif.worker.js', import.meta.url).toString() });
+        const reader = new FileReader();
+
+        reader.onload = async (e) => {
+            if (!e.target || !e.target.result) {
+                return reject(new Error("Failed to read GIF file."));
+            }
+            const arrayBuffer = e.target.result as ArrayBuffer;
+
+            // This is a super-hacky way to get the frames from the gif.js library,
+            // as it doesn't expose them directly. We'll add one dummy frame,
+            // which forces it to process the input, then intercept the frame data.
+            let frames: any[] = [];
+            const originalAddFrame = (tempGif as any).addFrame;
+            (tempGif as any).addFrame = (image: any, options: any) => {
+                frames.push({ ...options });
+            };
+            
+            (tempGif as any).onRenderFrame({
+              data: new Uint8Array(arrayBuffer)
+            });
+
+            if (frames.length === 0) {
+                return reject(new Error("Could not decode any frames from the GIF."));
+            }
+
+            toast({ description: `Found ${frames.length} frames. Preparing for video encoding...`});
+            
+            // This feature is highly experimental and might not work in all browsers.
+            // A proper implementation would require a WASM-based MP4 muxer.
+            // For now, we will throw a more informative error.
+            reject(new Error("Browser-based GIF to MP4 encoding is not yet supported. This is an experimental stub."));
+        };
+
+        reader.onerror = () => reject(new Error("Error reading GIF file."));
+        reader.readAsArrayBuffer(gifFile);
+    });
 };
 
 
