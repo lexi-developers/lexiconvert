@@ -1,5 +1,7 @@
 
-import { openDB, DBSchema } from 'idb';
+"use client";
+
+import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { ConversionResult } from '@/app/page';
 
 const DB_NAME = 'LexiConvertDB';
@@ -13,40 +15,56 @@ interface LexiConvertDB extends DBSchema {
   };
 }
 
-const dbPromise = openDB<LexiConvertDB>(DB_NAME, DB_VERSION, {
-  upgrade(db) {
-    if (!db.objectStoreNames.contains(STORE_NAME)) {
-      db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-    }
-  },
-});
+// Initialize promise to null. It will be created on the client side.
+let dbPromise: Promise<IDBPDatabase<LexiConvertDB>> | null = null;
+
+const getDb = () => {
+  if (typeof window === 'undefined') {
+    // Return a dummy promise on the server that will never resolve.
+    // This prevents errors during SSR. Operations will effectively be no-ops.
+    return new Promise<IDBPDatabase<LexiConvertDB>>(() => {});
+  }
+  if (!dbPromise) {
+    dbPromise = openDB<LexiConvertDB>(DB_NAME, DB_VERSION, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        }
+      },
+    });
+  }
+  return dbPromise;
+};
+
 
 export const addConversion = async (conversion: ConversionResult) => {
-  const db = await dbPromise;
-  await db.put(STORE_NAME, conversion);
+  const db = await getDb();
+  if (db) await db.put(STORE_NAME, conversion);
 };
 
 export const updateConversion = async (conversion: ConversionResult) => {
-  const db = await dbPromise;
-  await db.put(STORE_NAME, conversion);
+  const db = await getDb();
+  if (db) await db.put(STORE_NAME, conversion);
 }
 
 export const getConversion = async (id: string): Promise<ConversionResult | undefined> => {
-  const db = await dbPromise;
+  const db = await getDb();
+  if (!db) return undefined;
   return db.get(STORE_NAME, id);
 };
 
 export const getAllConversions = async (): Promise<ConversionResult[]> => {
-  const db = await dbPromise;
+  const db = await getDb();
+  if (!db) return [];
   return db.getAll(STORE_NAME);
 };
 
 export const deleteConversion = async (id: string) => {
-  const db = await dbPromise;
-  await db.delete(STORE_NAME, id);
+  const db = await getDb();
+  if (db) await db.delete(STORE_NAME, id);
 };
 
 export const clearAllConversions = async () => {
-    const db = await dbPromise;
-    await db.clear(STORE_NAME);
+    const db = await getDb();
+    if (db) await db.clear(STORE_NAME);
 }
