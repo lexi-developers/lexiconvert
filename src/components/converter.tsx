@@ -13,6 +13,8 @@ import {
   Image as ImageIcon,
   FileSymlink,
   Book,
+  FileSpreadsheet,
+  FileX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -34,11 +36,13 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import ePub from "epubjs";
+import JSZip from 'jszip';
+import * as XLSX from 'xlsx';
 
 // === TYPES AND CONSTANTS ===
 
 type ConversionStatus = "idle" | "converting" | "success" | "error";
-type DocumentFileType = "docx" | "txt" | "epub";
+type DocumentFileType = "docx" | "txt" | "epub" | "xlsx" | "pptx";
 type ImageFileType = "jpg" | "png" | "gif" | "bmp" | "webp" | "svg";
 type FileType = DocumentFileType | ImageFileType | "unknown";
 type OutputFormat = "pdf" | "jpg" | "png" | "webp" | "gif" | "bmp";
@@ -46,6 +50,8 @@ type OutputFormat = "pdf" | "jpg" | "png" | "webp" | "gif" | "bmp";
 const mimeTypeToType: Record<string, FileType> = {
   // Documents
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
   "text/plain": "txt",
   "application/epub+zip": "epub",
   // Images
@@ -59,6 +65,8 @@ const mimeTypeToType: Record<string, FileType> = {
 
 const supportedConversions: Record<FileType, OutputFormat[]> = {
   docx: ["pdf"],
+  xlsx: ["pdf"],
+  pptx: [], // Not supported
   txt: ["pdf"],
   epub: ["pdf"],
   jpg: ["pdf", "png", "webp", "gif", "bmp"],
@@ -66,7 +74,7 @@ const supportedConversions: Record<FileType, OutputFormat[]> = {
   gif: ["pdf", "jpg", "png", "webp", "bmp"],
   bmp: ["pdf", "jpg", "png", "webp", "gif"],
   webp: ["pdf", "jpg", "png", "gif", "bmp"],
-  svg: ["pdf", "png", "jpg"], // SVG conversion to bitmap is supported
+  svg: ["pdf", "png", "jpg"],
   unknown: [],
 };
 
@@ -82,10 +90,11 @@ const getFileTypeFromMime = (mime: string, extension: string): FileType => {
     if (extension === 'jpg' || extension === 'jpeg') return 'jpg';
     if (extension === 'png') return 'png';
     if (extension === 'epub') return 'epub';
-    // Add other extension fallbacks if needed
+    if (extension === 'docx') return 'docx';
+    if (extension === 'xlsx') return 'xlsx';
+    if (extension === 'pptx') return 'pptx';
     return "unknown";
 }
-
 
 // === REACT COMPONENT ===
 
@@ -103,7 +112,6 @@ export function Converter() {
   const availableOutputFormats = useMemo(() => {
     if (!file || fileType === "unknown") return [];
     
-    // Prevent converting to the same format
     const extension = getFileExtension(file.name) as OutputFormat;
     return (supportedConversions[fileType] || []).filter(f => f !== extension);
     
@@ -124,6 +132,14 @@ export function Converter() {
     }
   }, [convertedFileUrl]);
 
+  const handleUnsupportedFile = (extension: string) => {
+     toast({
+        variant: "destructive",
+        title: "不支援的檔案格式",
+        description: `抱歉，此離線版本不支援 .${extension} 檔案。`,
+      });
+  }
+
   const handleFileChange = (files: FileList | null) => {
     if (files && files.length > 0) {
       resetState();
@@ -131,12 +147,8 @@ export function Converter() {
       const extension = getFileExtension(selectedFile.name);
       const detectedType = getFileTypeFromMime(selectedFile.type, extension);
 
-      if (detectedType === "unknown" || supportedConversions[detectedType].length === 0) {
-        toast({
-          variant: "destructive",
-          title: "檔案格式不受支援",
-          description: `抱歉，目前不支援 .${extension} 檔案類型。`,
-        });
+       if (detectedType === "unknown" || supportedConversions[detectedType].length === 0) {
+        handleUnsupportedFile(extension);
         return;
       }
       
@@ -165,72 +177,81 @@ export function Converter() {
   };
 
   // === CONVERSION LOGIC ===
+
+  const drawTextInPdf = async (pdfDoc: PDFDocument, textContent: string) => {
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontSize = 12;
+    const page = pdfDoc.addPage();
+    const { width, height } = page.getSize();
+    
+    page.drawText(textContent, {
+        x: 50, y: height - 4 * fontSize, font, size: fontSize, color: rgb(0, 0, 0), maxWidth: width - 100, lineHeight: 15
+    });
+  }
   
   const convertEpubToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
     const book = ePub(arrayBuffer);
-    await book.ready;
-  
     const pdfDoc = await PDFDocument.create();
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const fontSize = 12;
-    const { width, height } = pdfDoc.addPage().getSize();
-    const margin = 50;
-    const maxTextWidth = width - 2 * margin;
-  
-    let currentPage = pdfDoc.getPage(0);
-    let y = height - margin;
-  
-    const addPageIfNeeded = () => {
-      if (y < margin) {
-        currentPage = pdfDoc.addPage();
-        y = height - margin;
-      }
-    };
-  
-    // Simplified content extraction
-    for (const item of book.spine.items) {
-      const doc = await item.load(book.load.bind(book));
-      const body = doc.querySelector('body');
-      if (body) {
-         // Create a temporary div to render HTML and extract text
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = body.innerHTML;
-
-        // Naive text extraction
-        const textContent = tempDiv.innerText || '';
-        const lines = textContent.split('\n');
-
-        for (const line of lines) {
-           // This is a very basic way to wrap text. pdf-lib doesn't have auto-wrapping.
-           // For a real app, a more sophisticated text wrapping algorithm is needed.
-           let currentLine = line;
-           while(currentLine.length > 0) {
-             let textFits = currentLine;
-             while(font.widthOfTextAtSize(textFits, fontSize) > maxTextWidth) {
-                textFits = textFits.slice(0, -1);
-             }
-             addPageIfNeeded();
-             currentPage.drawText(textFits, { x: margin, y, font, size: fontSize, color: rgb(0,0,0) });
-             y -= 15; // line height
-             currentLine = currentLine.substring(textFits.length);
-           }
+    await book.ready;
+    const textContent = (await Promise.all(book.spine.items.map(async (item) => {
+        const doc = await item.load(book.load.bind(book));
+        const body = doc.querySelector('body');
+        if (body) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = body.innerHTML;
+            return tempDiv.innerText || '';
         }
-        addPageIfNeeded();
-        y -= 20; // paragraph spacing
-      }
-    }
-  
+        return '';
+    }))).join('\n\n');
+
+    await drawTextInPdf(pdfDoc, textContent);
     const pdfBytes = await pdfDoc.save();
     return new Blob([pdfBytes], { type: "application/pdf" });
   };
 
+  const convertDocxToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    const content = await zip.file("word/document.xml")?.async("string");
+    
+    let textContent = "無法讀取 DOCX 內容。這是一個實驗性功能。";
+    if (content) {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(content, "application/xml");
+        const paragraphs = xmlDoc.getElementsByTagName("w:p");
+        let text = [];
+        for (let i = 0; i < paragraphs.length; i++) {
+            text.push(Array.from(paragraphs[i].getElementsByTagName("w:t")).map(t => t.textContent).join(''));
+        }
+        textContent = text.join('\n');
+    }
+    
+    toast({ title: "DOCX 轉換限制", description: "僅提取純文字，所有樣式和圖片均會遺失。" });
+    const pdfDoc = await PDFDocument.create();
+    await drawTextInPdf(pdfDoc, textContent);
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: "application/pdf" });
+  }
+
+  const convertXlsxToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    const data = XLSX.utils.sheet_to_csv(worksheet);
+    
+    toast({ title: "XLSX 轉換限制", description: "僅轉換第一張工作表的數據為純文字，所有樣式、圖表和公式均會遺失。" });
+    const pdfDoc = await PDFDocument.create();
+    await drawTextInPdf(pdfDoc, data);
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: "application/pdf" });
+  }
+
 
   const convertToPdf = async (arrayBuffer: ArrayBuffer): Promise<Blob> => {
+    if (fileType === 'epub') return convertEpubToPdf(arrayBuffer);
+    if (fileType === 'docx') return convertDocxToPdf(arrayBuffer);
+    if (fileType === 'xlsx') return convertXlsxToPdf(arrayBuffer);
+    
     const pdfDoc = await PDFDocument.create();
-
-    if (fileType === 'epub') {
-        return convertEpubToPdf(arrayBuffer);
-    }
 
     if (fileType === "jpg" || fileType === "png" || fileType === "gif" || fileType === "bmp" || fileType === "webp") {
       let image;
@@ -247,24 +268,10 @@ export function Converter() {
         const page = pdfDoc.addPage([image.width, image.height]);
         page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
 
-    } else { // txt, docx
-      const page = pdfDoc.addPage();
-      const { width, height } = page.getSize();
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const fontSize = 12;
-      let textContent = "";
-      
-      if (fileType === "docx") {
-        textContent = "DOCX parsing is complex and not fully supported in this offline version. This is a placeholder.";
-        toast({ title: "注意", description: "DOCX 內容解析功能受限。" });
-      } else if (fileType === "txt") {
+    } else if (fileType === "txt") {
         const decoder = new TextDecoder("utf-8");
-        textContent = decoder.decode(arrayBuffer);
-      }
-      
-      page.drawText(textContent, {
-        x: 50, y: height - 4 * fontSize, font, size: fontSize, color: rgb(0, 0, 0), maxWidth: width - 100, lineHeight: 15
-      });
+        const textContent = decoder.decode(arrayBuffer);
+        await drawTextInPdf(pdfDoc, textContent);
     }
 
     const pdfBytes = await pdfDoc.save();
@@ -275,7 +282,7 @@ export function Converter() {
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      if (!ctx) return reject(new Error('Could not get canvas context'));
+      if (!ctx) return reject(new Error('無法取得 Canvas context'));
 
       const img = new Image();
       img.onload = () => {
@@ -284,11 +291,11 @@ export function Converter() {
         ctx.drawImage(img, 0, 0);
         const targetMimeType = `image/${targetFormat}`;
         canvas.toBlob((blob) => {
-          if (!blob) return reject(new Error('Canvas to Blob conversion failed'));
+          if (!blob) return reject(new Error('Canvas to Blob 轉換失敗'));
           resolve(blob);
-        }, targetMimeType, 0.95); // Use quality 0.95 for JPG
+        }, targetMimeType, 0.95);
       };
-      img.onerror = () => reject(new Error('Image loading failed. The file might be corrupt or an unsupported format.'));
+      img.onerror = () => reject(new Error('圖片載入失敗。檔案可能已損毀或格式不支援。'));
       img.src = URL.createObjectURL(new Blob([arrayBuffer], { type: file?.type }));
     });
   };
@@ -353,6 +360,12 @@ export function Converter() {
     if (fileTypeStr === 'epub') {
         return <Book className="h-4 w-4" />;
     }
+    if (fileTypeStr === 'xlsx') {
+        return <FileSpreadsheet className="h-4 w-4" />;
+    }
+    if (fileTypeStr === 'pptx') {
+        return <FileX className="h-4 w-4 text-destructive" />;
+    }
     return <FileText className="h-4 w-4" />;
   }
   
@@ -385,7 +398,7 @@ export function Converter() {
             <p className="mt-4 text-center text-muted-foreground">
               <span className="font-semibold text-primary">點擊上傳</span> 或拖放檔案
             </p>
-            <p className="text-xs text-muted-foreground mt-1">支援 DOCX, TXT, EPUB, JPG, PNG, GIF, BMP, WEBP, SVG</p>
+            <p className="text-xs text-muted-foreground mt-1">支援 DOCX, XLSX, TXT, EPUB, JPG, PNG 等格式</p>
             <input
               ref={fileInputRef}
               type="file"
