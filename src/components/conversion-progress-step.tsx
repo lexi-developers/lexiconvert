@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -5,7 +6,7 @@ import { ConversionResult } from '@/app/page';
 import { performConversion, getFileExtension, getFileTypeFromMime } from '@/lib/conversions';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
-import { Loader, CheckCircle, XCircle } from 'lucide-react';
+import { Loader } from 'lucide-react';
 
 interface ConversionProgressStepProps {
   tasks: ConversionResult[];
@@ -76,19 +77,6 @@ export function ConversionProgressStep({ tasks, onConversionComplete }: Conversi
                 <p>Overall Progress: {Math.round(progress)}%</p>
                 {currentTask && <p>Processing: {currentTask.inputFile.name}</p>}
             </div>
-        </div>
-
-        <div className="w-full max-w-lg space-y-2">
-            <h3 className="font-semibold text-center">Conversion Details</h3>
-            <ul className="max-h-48 overflow-y-auto bg-background p-2 rounded-md border">
-                {results.map(res => (
-                    <li key={res.id} className="flex items-center justify-between text-sm p-1">
-                        <span className="truncate pr-4">{res.inputFile.name}</span>
-                        {res.status === 'success' && <CheckCircle className="h-4 w-4 text-green-500" />}
-                        {res.status === 'error' && <XCircle className="h-4 w-4 text-destructive" />}
-                    </li>
-                ))}
-            </ul>
         </div>
     </div>
   );
