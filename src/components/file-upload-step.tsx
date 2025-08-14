@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import JSZip from 'jszip';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { usePreview } from "@/context/preview-provider";
 
 
 interface FileUploadStepProps {
@@ -21,6 +22,7 @@ export function FileUploadStep({ onFilesSelected }: FileUploadStepProps) {
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const { showPreview } = usePreview();
 
   const processAndStageFiles = useCallback(async (fileList: FileList | null) => {
     if (!fileList) return;
@@ -89,6 +91,11 @@ export function FileUploadStep({ onFilesSelected }: FileUploadStepProps) {
       onFilesSelected(stagedFiles);
     }
   }
+  
+  const handlePreview = (e: React.MouseEvent, file: File) => {
+    e.preventDefault();
+    showPreview(file, file.name);
+  };
 
   return (
     <div className="space-y-6">
@@ -159,7 +166,14 @@ export function FileUploadStep({ onFilesSelected }: FileUploadStepProps) {
               <TableBody>
                 {stagedFiles.map((file, index) => (
                   <TableRow key={`${file.name}-${file.size}-${index}`}>
-                    <TableCell className="font-medium truncate max-w-sm">{file.name}</TableCell>
+                    <TableCell className="font-medium truncate max-w-sm">
+                        <span 
+                            className="cursor-pointer hover:underline" 
+                            onClick={(e) => handlePreview(e, file)}
+                        >
+                            {file.name}
+                        </span>
+                    </TableCell>
                     <TableCell>{(file.size / 1024).toFixed(2)} KB</TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon" onClick={() => handleRemoveFile(file)}>
