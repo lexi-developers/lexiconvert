@@ -65,9 +65,9 @@ export default function Home() {
     }
   }
 
-  const handleDeleteFromHistory = async (id: string) => {
-    await deleteConversion(id);
-    setHistory(prev => prev.filter(item => item.id !== id));
+  const handleDeleteFromHistory = (ids: string | string[]) => {
+    const idsToDelete = Array.isArray(ids) ? ids : [ids];
+    setHistory(prev => prev.filter(item => !idsToDelete.includes(item.id)));
   }
 
 
@@ -123,9 +123,11 @@ export default function Home() {
 
       </div>
        <Dialog open={isConversionFlowOpen} onOpenChange={setIsConversionFlowOpen}>
-          <DialogContent className="max-w-4xl w-full h-full sm:h-[90vh] flex flex-col p-0">
-              <ConversionFlow onDone={handleFlowDone} />
-          </DialogContent>
+        <DialogContent className="max-w-4xl w-full h-full sm:h-[90vh] flex flex-col p-0">
+          <ConversionFlow
+            onDone={handleFlowDone}
+          />
+        </DialogContent>
        </Dialog>
     </main>
   );

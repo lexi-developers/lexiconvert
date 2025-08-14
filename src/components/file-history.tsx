@@ -23,11 +23,12 @@ import JSZip from 'jszip';
 import { ConversionResult } from "@/app/page";
 import { getFileIcon } from "@/lib/icons";
 import { usePreview } from "@/context/preview-provider";
+import { deleteConversion } from "@/lib/db";
 
 interface FileHistoryProps {
   history: ConversionResult[];
   setHistory: React.Dispatch<React.SetStateAction<ConversionResult[]>>;
-  onDelete: (id: string) => void;
+  onDelete: (id: string | string[]) => void;
 }
 
 const getOutputFilename = (inputFile: File, outputFileType?: string): string => {
@@ -78,12 +79,22 @@ export function FileHistory({ history, setHistory, onDelete }: FileHistoryProps)
     URL.revokeObjectURL(url);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
+    await deleteConversion(id);
     onDelete(id);
     const newSelection = new Set(selectedItems);
     newSelection.delete(id);
     setSelectedItems(newSelection);
   };
+
+  const handleDeleteSelected = async () => {
+    const idsToDelete = Array.from(selectedItems);
+    for (const id of idsToDelete) {
+        await deleteConversion(id);
+    }
+    onDelete(idsToDelete);
+    setSelectedItems(new Set());
+  }
   
   const getSelectedResultObjects = () => {
     return uniqueHistory.filter(r => selectedItems.has(r.id));
@@ -98,7 +109,7 @@ export function FileHistory({ history, setHistory, onDelete }: FileHistoryProps)
             zip.file(filename, result.outputBlob);
         }
     });
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const zipBlob = await zip.generateAsync({ type: "blob" });
     handleDownload(zipBlob, `LexiConvert_Batch_${Date.now()}.zip`);
   };
 
@@ -123,21 +134,6 @@ export function FileHistory({ history, setHistory, onDelete }: FileHistoryProps)
 
   return (
      <div className="space-y-4">
-        {selectedCount > 0 && (
-            <div className="flex justify-end items-center">
-                {selectedCount > 1 ? (
-                    <Button onClick={handleDownloadZip}>
-                        <FileArchive className="mr-2 h-4 w-4" />
-                        Download ZIP ({selectedCount})
-                    </Button>
-                ) : (
-                    <Button onClick={handleDownloadSelected}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Download Selected ({selectedCount})
-                    </Button>
-                )}
-            </div>
-        )}
         <div className="border rounded-lg">
         <Table>
             <TableHeader>
@@ -153,7 +149,32 @@ export function FileHistory({ history, setHistory, onDelete }: FileHistoryProps)
                 <TableHead className="w-[50px]">Type</TableHead>
                 <TableHead>Filename</TableHead>
                 <TableHead>Date</TableHead>
-                <TableHead className="w-[50px] text-right"></TableHead>
+                <TableHead className="w-[50px] text-right">
+                   <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" disabled={selectedCount === 0}>
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">Batch Actions</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={handleDownloadSelected} disabled={selectedCount === 0}>
+                           <Download className="mr-2 h-4 w-4" />
+                           Download Selected ({selectedCount})
+                        </DropdownMenuItem>
+                         {selectedCount > 1 && (
+                            <DropdownMenuItem onClick={handleDownloadZip}>
+                                <FileArchive className="mr-2 h-4 w-4" />
+                                Download ZIP ({selectedCount})
+                            </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={handleDeleteSelected} className="text-destructive" disabled={selectedCount === 0}>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete Selected ({selectedCount})
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                </TableHead>
             </TableRow>
             </TableHeader>
             <TableBody>
