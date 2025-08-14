@@ -61,7 +61,7 @@ export default function Home() {
         </header>
 
         {history.length > 0 ? (
-          <FileHistory history={history} />
+          <FileHistory history={history} setHistory={setHistory} />
         ) : (
           <div className="flex items-center justify-center h-[60vh]">
             <div className="text-center p-8 border border-dashed rounded-lg">
