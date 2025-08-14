@@ -14,6 +14,12 @@ if (typeof window !== 'undefined') {
   ).toString();
 }
 
+// === UNIQUE ID GENERATOR ===
+let idCounter = 0;
+export const generateUniqueId = (filename: string) => {
+    return `${filename}-${Date.now()}-${idCounter++}`;
+}
+
 // === TYPES AND CONSTANTS ===
 
 export type DocumentFileType = "docx" | "txt" | "epub" | "xlsx" | "pptx" | "pdf";

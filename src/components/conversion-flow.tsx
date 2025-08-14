@@ -7,6 +7,7 @@ import { FileConfigStep } from "./file-config-step";
 import { ConversionProgressStep } from "./conversion-progress-step";
 import { ConversionResultStep } from "./conversion-result-step";
 import { Button } from "./ui/button";
+import { generateUniqueId } from "@/lib/conversions";
 
 type FlowStep = "upload" | "config" | "progress" | "result";
 
@@ -22,7 +23,7 @@ export function ConversionFlow({ onComplete, onCancel }: ConversionFlowProps) {
 
   const handleFilesSelected = (files: File[]) => {
     const newTasks: ConversionResult[] = files.map((file) => ({
-      id: `${file.name}-${file.lastModified}-${Math.random()}`,
+      id: generateUniqueId(file.name),
       inputFile: file,
       status: "pending",
     }));
