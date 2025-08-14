@@ -61,11 +61,6 @@ export default function Home() {
           <ConversionFlow onComplete={handleConversionComplete} onDone={handleFlowDone} />
         )}
 
-        <footer className="text-center mt-12 text-sm text-muted-foreground">
-          <p>
-            &copy; {new Date().getFullYear()} LexiConvert. All rights reserved.
-          </p>
-        </footer>
       </div>
     </main>
   );
