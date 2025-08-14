@@ -43,9 +43,6 @@ export default function Home() {
             <h1 className="text-4xl sm:text-5xl font-bold font-headline">
               LexiConvert
             </h1>
-            <p className="text-muted-foreground mt-2 text-lg">
-              A simple, secure, and offline file conversion tool.
-            </p>
           </div>
           {view === "history" && (
             <Button size="lg" onClick={() => setView("conversion")}>
