@@ -10,6 +10,8 @@ import {
   Braces,
   FileJson,
   FileArchive,
+  FileAudio,
+  FileVideo,
 } from "lucide-react";
 import { getFileExtension, getFileTypeFromMime, FileType } from "./conversions";
 
@@ -19,6 +21,12 @@ export const getFileIcon = (filename: string, filetype: string) => {
     
     if (['jpg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico'].includes(type)) {
         return <ImageIcon className="h-full w-full" />;
+    }
+    if (['mp3', 'wav', 'ogg', 'm4a'].includes(type)) {
+        return <FileAudio className="h-full w-full" />;
+    }
+    if (['mp4', 'mov', 'avi', 'webm'].includes(type)) {
+        return <FileVideo className="h-full w-full" />;
     }
     if (type === 'epub') return <Book className="h-full w-full" />;
     if (type === 'xlsx') return <FileSpreadsheet className="h-full w-full" />;

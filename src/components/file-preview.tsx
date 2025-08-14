@@ -2,9 +2,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, ChevronLeft, ChevronRight, XCircle } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, XCircle, X } from 'lucide-react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
@@ -27,6 +27,9 @@ interface FilePreviewProps {
 
 const PREVIEWABLE_IMAGE_TYPES = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'];
 const PREVIEWABLE_TEXT_TYPES = ['txt', 'json', 'md', 'xml', 'html', 'css', 'js', 'ts', 'py', 'sql', 'csv'];
+const PREVIEWABLE_AUDIO_TYPES = ['mp3', 'wav', 'ogg', 'm4a'];
+const PREVIEWABLE_VIDEO_TYPES = ['mp4', 'webm', 'mov'];
+
 
 const getFileDetails = (file: File | Blob, name: string) => {
     const extension = getFileExtension(name);
@@ -34,7 +37,9 @@ const getFileDetails = (file: File | Blob, name: string) => {
     const isImage = PREVIEWABLE_IMAGE_TYPES.includes(type);
     const isText = PREVIEWABLE_TEXT_TYPES.includes(type);
     const isPdf = type === 'pdf';
-    return { isImage, isText, isPdf, type };
+    const isAudio = PREVIEWABLE_AUDIO_TYPES.includes(type);
+    const isVideo = PREVIEWABLE_VIDEO_TYPES.includes(type);
+    return { isImage, isText, isPdf, isAudio, isVideo, type };
 };
 
 export function FilePreview({ file, fileName, isOpen, onClose }: FilePreviewProps) {
@@ -44,8 +49,8 @@ export function FilePreview({ file, fileName, isOpen, onClose }: FilePreviewProp
   const [pageNumber, setPageNumber] = useState(1);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   
-  const { isImage, isText, isPdf, type } = useMemo(() => 
-    file ? getFileDetails(file, fileName) : { isImage: false, isText: false, isPdf: false, type: 'unknown' },
+  const { isImage, isText, isPdf, isAudio, isVideo, type } = useMemo(() => 
+    file ? getFileDetails(file, fileName) : { isImage: false, isText: false, isPdf: false, isAudio: false, isVideo: false, type: 'unknown' },
   [file, fileName]);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
@@ -80,11 +85,11 @@ export function FilePreview({ file, fileName, isOpen, onClose }: FilePreviewProp
       } catch (e) {
         setError('Failed to read file content.');
       }
-    } else if (!isImage && !isPdf) {
+    } else if (!isImage && !isPdf && !isAudio && !isVideo) {
         setError(`Preview is not available for this file type (.${getFileExtension(fileName)}).`);
     }
 
-  }, [file, isText, isImage, isPdf, fileName, type]);
+  }, [file, isText, isImage, isPdf, isAudio, isVideo, fileName, type]);
 
 
   useEffect(() => {
@@ -100,7 +105,7 @@ export function FilePreview({ file, fileName, isOpen, onClose }: FilePreviewProp
   }, [isOpen]);
 
   const renderContent = () => {
-    const isLoading = !content && !error && !isImage && !isPdf && !numPages;
+    const isLoading = !content && !error && !isImage && !isPdf && !isAudio && !isVideo && !numPages;
 
     if (isLoading && !isPdf) {
       return (
@@ -123,6 +128,14 @@ export function FilePreview({ file, fileName, isOpen, onClose }: FilePreviewProp
     
     if (isImage && fileUrl) {
       return <img src={fileUrl} alt={`Preview of ${fileName}`} className="max-w-full max-h-[85vh] object-contain" />;
+    }
+
+    if (isAudio && fileUrl) {
+        return <audio src={fileUrl} controls autoPlay className="w-full" />;
+    }
+
+    if (isVideo && fileUrl) {
+        return <video src={fileUrl} controls autoPlay className="max-w-full max-h-[85vh]" />;
     }
     
     if (isPdf && fileUrl) {
@@ -183,7 +196,11 @@ export function FilePreview({ file, fileName, isOpen, onClose }: FilePreviewProp
     <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl w-full h-[95vh] flex flex-col">
             <DialogHeader>
-            <DialogTitle className="truncate pr-8">{fileName}</DialogTitle>
+                <DialogTitle className="truncate pr-8">{fileName}</DialogTitle>
+                <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Close</span>
+                </DialogClose>
             </DialogHeader>
             <div className="flex-grow flex items-center justify-center py-4 overflow-y-auto bg-gray-100/50 dark:bg-gray-800/50 rounded-md">
                 {renderContent()}

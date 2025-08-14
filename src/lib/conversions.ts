@@ -25,9 +25,11 @@ export const generateUniqueId = (filename: string) => {
 
 export type DocumentFileType = "docx" | "txt" | "epub" | "xlsx" | "pptx" | "pdf";
 export type ImageFileType = "jpg" | "png" | "gif" | "bmp" | "webp" | "svg" | "ico";
+export type AudioFileType = "mp3" | "wav" | "m4a" | "ogg";
+export type VideoFileType = "mp4" | "mov" | "avi" | "webm";
 export type TextBasedFileType = "html" | "xml" | "csv" | "json" | "md" | "js" | "ts" | "css" | "py" | "sql";
-export type FileType = DocumentFileType | ImageFileType | TextBasedFileType | "unknown";
-export type OutputFormat = "pdf" | "jpg" | "png" | "webp" | "gif" | "bmp" | "svg" | "zip" | "ico";
+export type FileType = DocumentFileType | ImageFileType | AudioFileType | VideoFileType | TextBasedFileType | "unknown";
+export type OutputFormat = "pdf" | "jpg" | "png" | "webp" | "gif" | "bmp" | "svg" | "zip" | "ico" | "mp3" | "wav" | "mp4";
 
 export const mimeTypeToType: Record<string, FileType> = {
   // Documents
@@ -46,6 +48,17 @@ export const mimeTypeToType: Record<string, FileType> = {
   "image/svg+xml": "svg",
   "image/x-icon": "ico",
   "image/vnd.microsoft.icon": "ico",
+  // Audio
+  "audio/mpeg": "mp3",
+  "audio/wav": "wav",
+  "audio/mp4": "m4a",
+  "audio/ogg": "ogg",
+  "audio/webm": "ogg",
+  // Video
+  "video/mp4": "mp4",
+  "video/quicktime": "mov",
+  "video/x-msvideo": "avi",
+  "video/webm": "webm",
   // Text-based & Code
   "text/html": "html",
   "text/xml": "xml",
@@ -73,11 +86,21 @@ export const supportedConversions: Record<FileType, OutputFormat[]> = {
   // Images
   jpg: ["png", "pdf", "webp", "gif", "bmp", "svg", "ico"],
   png: ["jpg", "pdf", "webp", "gif", "bmp", "svg", "ico"],
-  gif: ["png", "pdf", "jpg", "webp", "bmp", "ico"],
+  gif: ["png", "pdf", "jpg", "webp", "bmp", "ico", "mp4"],
   bmp: ["png", "pdf", "jpg", "webp", "gif", "svg", "ico"],
   webp: ["png", "pdf", "jpg", "gif", "bmp", "svg", "ico"],
   svg: ["png", "pdf", "jpg", "ico"],
   ico: ["png", "jpg", "webp", "bmp", "gif", "pdf"],
+  // Audio
+  mp3: ["wav"],
+  wav: ["mp3"],
+  m4a: ["mp3", "wav"],
+  ogg: ["mp3", "wav"],
+  // Video
+  mp4: ["gif", "mp3"],
+  mov: ["mp4", "gif", "mp3"],
+  avi: ["mp4", "gif", "mp3"],
+  webm: ["mp4", "gif", "mp3"],
   // Text-based
   html: ["pdf"],
   xml: ["pdf"],
@@ -109,6 +132,8 @@ export const getFileTypeFromMime = (mime: string, extension: string): FileType =
         'xml': 'xml', 'csv': 'csv', 'json': 'json', 'md': 'md', 'js': 'js',
         'ts': 'ts', 'css': 'css', 'py': 'py', 'sql': 'sql', 'txt': 'txt',
         'pdf': 'pdf', 'ico': 'ico',
+        'mp3': 'mp3', 'wav': 'wav', 'm4a': 'm4a', 'ogg': 'ogg',
+        'mp4': 'mp4', 'mov': 'mov', 'avi': 'avi', 'webm': 'webm'
     };
     if (extMap[extension]) return extMap[extension];
     return "unknown";
@@ -116,6 +141,33 @@ export const getFileTypeFromMime = (mime: string, extension: string): FileType =
 
 
 // === CONVERSION HELPERS ===
+
+const mockApiCall = (file: File, outputFormat: string, toast: (options:any) => void): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+        toast({
+            title: "Simulating Backend Conversion",
+            description: `This is a placeholder. In a real app, '${file.name}' would be uploaded and converted to ${outputFormat} on a server.`,
+            duration: 5000
+        });
+        setTimeout(() => {
+            // Simulate a successful conversion by creating a dummy file
+            const dummyContent = `This is a mock converted ${outputFormat} file from ${file.name}.`;
+            const mimeType = outputFormat === 'mp3' ? 'audio/mpeg' : `video/${outputFormat}`;
+            const blob = new Blob([dummyContent], { type: mimeType });
+            resolve(blob);
+        }, 3000);
+    });
+};
+
+const convertAudio = async(file: File, outputFormat: 'mp3' | 'wav', toast: (options: any) => void): Promise<Blob> => {
+    // In a real app, this would be an API call to a backend with FFMPEG
+    return mockApiCall(file, outputFormat, toast);
+}
+
+const convertVideo = async(file: File, outputFormat: 'mp4' | 'gif' | 'mp3', toast: (options: any) => void): Promise<Blob> => {
+    // In a real app, this would be an API call to a backend with FFMPEG
+    return mockApiCall(file, outputFormat, toast);
+}
 
 const drawTextInPdf = async (pdfDoc: PDFDocument, textContent: string, useMonospace: boolean = false) => {
     const font = await pdfDoc.embedFont(useMonospace ? StandardFonts.Courier : StandardFonts.Helvetica);
@@ -276,7 +328,7 @@ const convertPdfToImages = async (
     }
 };
 
-const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targetFormat: Exclude<OutputFormat, 'pdf' | 'svg' | 'zip' | 'ico'>): Promise<Blob> => {
+const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targetFormat: Exclude<OutputFormat, 'pdf' | 'svg' | 'zip' | 'ico' | 'mp3' | 'wav' | 'mp4'>): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -391,7 +443,15 @@ export const performConversion = async (file: File, fileType: FileType, outputFo
     let finalOutputFormat: string = outputFormat;
 
     const imageOutputFormats = ["png", "jpg", "webp", "bmp"];
-    if (fileType === 'pdf' && imageOutputFormats.includes(outputFormat)) {
+    const audioOutputFormats = ["mp3", "wav"];
+    const videoOutputFormats = ["mp4", "gif"];
+
+    if (audioOutputFormats.includes(outputFormat)) {
+        blob = await convertAudio(file, outputFormat as 'mp3' | 'wav', toast);
+    } else if (videoOutputFormats.includes(outputFormat) || (fileType.startsWith('video') && outputFormat === 'mp3')) {
+        blob = await convertVideo(file, outputFormat as 'mp4' | 'gif' | 'mp3', toast);
+    }
+    else if (fileType === 'pdf' && imageOutputFormats.includes(outputFormat)) {
         const result = await convertPdfToImages(arrayBuffer, outputFormat as 'png' | 'jpg' | 'webp' | 'bmp', toast);
         blob = result.blob;
         if (result.isZip) {
@@ -431,7 +491,7 @@ export const performConversion = async (file: File, fileType: FileType, outputFo
         }
     }
     else {
-      blob = await convertImage(arrayBuffer, fileType, outputFormat as Exclude<OutputFormat, 'pdf' | 'svg' | 'zip' | 'ico'>);
+      blob = await convertImage(arrayBuffer, fileType, outputFormat as Exclude<OutputFormat, 'pdf' | 'svg' | 'zip' | 'ico' | 'mp3' | 'wav' | 'mp4'>);
     }
     return { blob, finalOutputFormat };
 }
