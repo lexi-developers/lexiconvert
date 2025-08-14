@@ -124,7 +124,7 @@ export function FileUploadStep({ onFilesSelected }: FileUploadStepProps) {
               <UploadCloud className="w-16 h-16 text-muted-foreground" />
               <h2 className="mt-6 text-2xl font-semibold">Drag & drop files or folders here</h2>
               <p className="mt-2 text-muted-foreground">
-                or use the buttons below
+                It will not be uploaded to our server.
               </p>
               <div className="mt-6 flex gap-4">
                 <Button size="lg" onClick={() => fileInputRef.current?.click()} disabled={isProcessing}>
