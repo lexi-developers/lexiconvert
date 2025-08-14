@@ -264,35 +264,38 @@ const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<B
     return new Promise(async (resolve, reject) => {
         toast({ description: "Starting video to GIF conversion. This may be slow and consume significant memory." });
         
-        // Dynamically import gif.js
         const { default: GIF } = await import('gif.js');
 
         const videoUrl = URL.createObjectURL(file);
         const video = document.createElement('video');
         video.muted = true;
         video.playsInline = true;
+        video.preload = 'auto';
         video.src = videoUrl;
 
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
+        video.addEventListener('error', (e) => {
             URL.revokeObjectURL(videoUrl);
-            return reject(new Error("Could not create canvas context."));
-        }
+            reject(new Error("Failed to load video file. It might be in an unsupported format or corrupt."));
+        });
 
-        video.onloadedmetadata = () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const duration = video.duration;
-
-            // BUG FIX: Ensure duration is a valid number before calculating frameRate and frameDelay.
-            if (!duration || !isFinite(duration) || duration <= 0) {
-                 URL.revokeObjectURL(videoUrl);
-                 return reject(new Error("Invalid video duration. Cannot convert to GIF."));
+        video.addEventListener('loadedmetadata', async () => {
+            if (!isFinite(video.duration) || video.duration <= 0) {
+                URL.revokeObjectURL(videoUrl);
+                return reject(new Error("Invalid video duration. Cannot convert to GIF."));
             }
 
-            const frameRate = 10; // Capture 10 frames per second
-            const frameDelay = 1000 / frameRate; // Delay in ms
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                URL.revokeObjectURL(videoUrl);
+                return reject(new Error("Could not create canvas context."));
+            }
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            const frameRate = 10;
+            const delay = 1000 / frameRate;
 
             const gif = new GIF({
                 workers: 2,
@@ -300,40 +303,40 @@ const convertVideoToGif = (file: File, toast: (options: any) => void): Promise<B
                 workerScript: new URL('gif.js/dist/gif.worker.js', import.meta.url).toString(),
             });
 
-            video.currentTime = 0;
+            gif.on('finished', (blob: Blob) => {
+                URL.revokeObjectURL(videoUrl);
+                video.remove();
+                canvas.remove();
+                resolve(blob);
+            });
 
-            const captureFrame = () => {
-                if (!ctx) return;
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                // BUG FIX: Ensure frameDelay is a valid number before adding frame
-                const validDelay = isFinite(frameDelay) ? frameDelay : 100;
-                gif.addFrame(ctx, { copy: true, delay: validDelay });
+            let currentTime = 0;
 
-                if (video.currentTime < duration) {
-                    video.currentTime += 1 / frameRate;
-                } else {
+            const captureFrame = async () => {
+                if (currentTime > video.duration) {
                     toast({ description: "Finalizing GIF, please wait..." });
-                    gif.on('finished', (blob: Blob) => {
-                        URL.revokeObjectURL(videoUrl);
-                        video.remove();
-                        canvas.remove();
-                        resolve(blob);
-                    });
                     gif.render();
+                    return;
                 }
+
+                video.currentTime = currentTime;
+                
+                await new Promise(resolveSeek => {
+                    video.addEventListener('seeked', () => resolveSeek(null), { once: true });
+                });
+
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                gif.addFrame(ctx, { copy: true, delay: delay });
+
+                currentTime += 1 / frameRate;
+                setTimeout(captureFrame, 0); // Use setTimeout to avoid blocking the main thread
             };
 
-            video.onseeked = captureFrame;
-            
-            // Start the process
-            video.currentTime = 0.1; // Seek to first frame to trigger onseeked
-        };
-
-        video.onerror = (e) => {
-            URL.revokeObjectURL(videoUrl);
-            reject(new Error("Failed to load video file. It might be in a format your browser doesn't support."));
-        };
+            // Start playing to buffer frames and then start capturing
+            await video.play();
+            video.pause();
+            captureFrame();
+        });
     });
 };
 
