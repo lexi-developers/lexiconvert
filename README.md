@@ -5,17 +5,18 @@
 </p>
 
 <p align="center">
-  <strong>A powerful, privacy-first, modern file conversion tool that runs entirely in your browser.</strong>
+  <strong>A powerful, privacy-first, modern file conversion tool that runs entirely in your browser—no internet connection required.</strong>
 </p>
 
 ---
 
 ## 🚀 About LexiConvert
 
-LexiConvert is a file conversion application designed for users who prioritize privacy and efficiency. Unlike traditional online conversion tools, LexiConvert leverages the power of your browser to perform all conversion tasks locally. This means your files never leave your computer, guaranteeing absolute data security and privacy. Whether you need to convert images, documents, audio, or video, LexiConvert provides a seamless, secure, and performant solution.
+LexiConvert is a file conversion application designed for users who prioritize privacy and efficiency. Unlike traditional online conversion tools, LexiConvert leverages the power of your browser to perform all conversion tasks **locally and offline**. Once the application is loaded, you no longer need an internet connection. This means your files never leave your computer, guaranteeing absolute data security and privacy. Whether you need to convert images, documents, audio, or video, LexiConvert provides a seamless, secure, and performant solution.
 
 **Core Features:**
-*   **Local-First Processing**: All file conversions happen within your browser's sandbox. Your data remains 100% private.
+*   **Offline First**: All file conversions happen within your browser's sandbox. After the initial load, no internet connection is needed.
+*   **Absolute Privacy**: Your data is never uploaded to any server. It remains 100% private and on your device.
 *   **Extensive Format Support**:
     *   **Documents**: Convert DOCX, XLSX, EPUB, and TXT files to PDF. Extract pages from PDFs into images (PNG, JPG, etc.).
     *   **Images**: Convert between common image formats like PNG, JPG, WEBP, BMP, GIF, and even convert images to PDF, SVG (experimental), or ICO.
