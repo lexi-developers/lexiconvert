@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Plus } from "lucide-react";
 import { FileHistory } from "@/components/file-history";
 import { ConversionFlow } from "@/components/conversion-flow";
@@ -27,14 +27,6 @@ export type ConversionResult = {
 export default function Home() {
   const [history, setHistory] = useState<ConversionResult[]>([]);
   const [isConversionFlowOpen, setIsConversionFlowOpen] = useState(false);
-
-  // On initial load, if there's no history, open the conversion dialog.
-  useEffect(() => {
-    if (history.length === 0) {
-      setIsConversionFlowOpen(true);
-    }
-  }, [history.length]);
-
 
   const handleFlowDone = (results: ConversionResult[] = []) => {
     // Add the new results to the history and close the dialog.
