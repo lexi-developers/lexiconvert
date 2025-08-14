@@ -6,7 +6,7 @@ import { ConversionResult } from '@/app/page';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowRight, Trash2, ArrowLeft } from 'lucide-react';
+import { ArrowRight, Trash2 } from 'lucide-react';
 import { getFileExtension, getFileTypeFromMime, supportedConversions, OutputFormat } from '@/lib/conversions';
 import { getFileIcon } from '@/lib/icons';
 import { usePreview } from '@/context/preview-provider';
@@ -22,7 +22,9 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
     initialFiles.map(file => {
       const extension = getFileExtension(file.inputFile.name);
       const type = getFileTypeFromMime(file.inputFile.type, extension);
-      const availableFormats = supportedConversions[type] || [];
+      // Filter out the original format from the list of available formats
+      const availableFormats = (supportedConversions[type] || []).filter(f => f !== type);
+
       return {
         ...file,
         outputFileType: availableFormats[0], // Set default output format
@@ -58,7 +60,6 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
 
   return (
     <div className="space-y-6">
-       <h2 className="text-2xl font-semibold">Configure Conversion</h2>
        <div className="border rounded-lg">
         <Table>
             <TableHeader>
@@ -74,7 +75,8 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
             {tasks.map(task => {
                 const extension = getFileExtension(task.inputFile.name);
                 const type = getFileTypeFromMime(task.inputFile.type, extension);
-                const availableFormats = supportedConversions[type] || [];
+                const availableFormats = (supportedConversions[type] || []).filter(f => f !== type);
+                
                 return (
                 <TableRow key={task.id}>
                     <TableCell>
@@ -124,7 +126,7 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
         </Table>
       </div>
 
-      <div className="flex justify-end items-center">
+      <div className="flex justify-end items-center pt-4">
         <Button size="lg" onClick={() => onConfigComplete(tasks)} disabled={isNextDisabled}>
           Start Conversion
           <ArrowRight className="ml-2 h-4 w-4" />

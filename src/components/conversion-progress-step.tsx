@@ -7,15 +7,13 @@ import { performConversion, getFileExtension, getFileTypeFromMime } from '@/lib/
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { Loader } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 interface ConversionProgressStepProps {
   tasks: ConversionResult[];
   onConversionComplete: (results: ConversionResult[]) => void;
-  onCancelRequest: () => void;
 }
 
-export function ConversionProgressStep({ tasks, onConversionComplete, onCancelRequest }: ConversionProgressStepProps) {
+export function ConversionProgressStep({ tasks, onConversionComplete }: ConversionProgressStepProps) {
   const [results, setResults] = useState<ConversionResult[]>([]);
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
@@ -60,22 +58,17 @@ export function ConversionProgressStep({ tasks, onConversionComplete, onCancelRe
     };
 
     processAllTasks();
-  }, [tasks, onConversionComplete, toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, onConversionComplete]);
 
   return (
-    <div className="space-y-6 flex flex-col items-center justify-center p-8 bg-background rounded-lg shadow-2xl animate-in fade-in-0 zoom-in-95 duration-500">
-        <div className="flex items-center gap-4 text-2xl font-semibold">
-            <Loader className="animate-spin h-8 w-8" />
-            <p>Converting files...</p>
-        </div>
+    <div className="h-full flex flex-col items-center justify-center space-y-6 p-8">
+        <Loader className="animate-spin h-16 w-16" />
         
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-md space-y-2">
             <Progress value={progress} className="transition-all duration-500 ease-in-out"/>
         </div>
 
-        <Button variant="outline" onClick={onCancelRequest} className="mt-4">
-            Cancel
-        </Button>
     </div>
   );
 }

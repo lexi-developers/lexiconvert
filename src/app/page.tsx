@@ -6,14 +6,13 @@ import { Plus } from "lucide-react";
 import { FileHistory } from "@/components/file-history";
 import { ConversionFlow } from "@/components/conversion-flow";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-
-type View = "history" | "conversion";
 
 export type ConversionResult = {
   id: string;
@@ -27,28 +26,22 @@ export type ConversionResult = {
 
 export default function Home() {
   const [history, setHistory] = useState<ConversionResult[]>([]);
-  const [view, setView] = useState<View>("history");
+  const [isConversionFlowOpen, setIsConversionFlowOpen] = useState(false);
 
-  // On initial load, if there's no history, go directly to the conversion view.
+  // On initial load, if there's no history, open the conversion dialog.
   useEffect(() => {
     if (history.length === 0) {
-      setView("conversion");
-    } else {
-      setView("history");
+      setIsConversionFlowOpen(true);
     }
   }, [history.length]);
 
 
-  const handleConversionComplete = (results: ConversionResult[]) => {
-    // This function is now primarily for potential future use, like logging.
-    // The main history update is handled by handleFlowDone.
-    console.log("Conversion complete:", results);
-  };
-
   const handleFlowDone = (results: ConversionResult[] = []) => {
-    // Add the new results to the history and switch the view.
-    setHistory((prev) => [...results, ...prev]);
-    setView("history");
+    // Add the new results to the history and close the dialog.
+    if (results.length > 0) {
+      setHistory((prev) => [...results, ...prev]);
+    }
+    setIsConversionFlowOpen(false);
   }
 
   return (
@@ -60,30 +53,36 @@ export default function Home() {
               LexiConvert
             </h1>
           </div>
-          {view === "history" && history.length > 0 && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button size="icon" variant="outline" className="rounded-full" onClick={() => setView("conversion")}>
-                    <Plus className="h-5 w-5" />
-                    <span className="sr-only">New Conversion</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>New Conversion</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="outline" className="rounded-full" onClick={() => setIsConversionFlowOpen(true)}>
+                  <Plus className="h-5 w-5" />
+                  <span className="sr-only">New Conversion</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>New Conversion</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </header>
 
-        {view === "history" && history.length > 0 ? (
+        {history.length > 0 ? (
           <FileHistory history={history} />
         ) : (
-          <ConversionFlow onComplete={handleConversionComplete} onDone={handleFlowDone} />
+          <div className="text-center py-24">
+             <h2 className="text-2xl font-semibold text-gray-700">Welcome to LexiConvert!</h2>
+             <p className="mt-2 text-muted-foreground">Click the '+' button to start your first file conversion.</p>
+          </div>
         )}
 
       </div>
+       <Dialog open={isConversionFlowOpen} onOpenChange={setIsConversionFlowOpen}>
+          <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col p-0" hideCloseButton={true}>
+              <ConversionFlow onDone={handleFlowDone} />
+          </DialogContent>
+       </Dialog>
     </main>
   );
 }

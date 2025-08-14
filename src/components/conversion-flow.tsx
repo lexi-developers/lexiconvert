@@ -2,13 +2,16 @@
 "use client";
 
 import { useState } from "react";
+import { useDialog } from "@/hooks/use-dialog";
 import { ConversionResult } from "@/app/page";
 import { FileUploadStep } from "./file-upload-step";
 import { FileConfigStep } from "./file-config-step";
 import { ConversionProgressStep } from "./conversion-progress-step";
 import { ConversionResultStep } from "./conversion-result-step";
 import { generateUniqueId } from "@/lib/conversions";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import { X, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,11 +26,10 @@ import {
 type FlowStep = "upload" | "config" | "progress" | "result";
 
 interface ConversionFlowProps {
-  onComplete: (results: ConversionResult[]) => void;
   onDone: (results: ConversionResult[]) => void;
 }
 
-export function ConversionFlow({ onComplete, onDone }: ConversionFlowProps) {
+export function ConversionFlow({ onDone }: ConversionFlowProps) {
   const [step, setStep] = useState<FlowStep>("upload");
   const [filesToConvert, setFilesToConvert] = useState<ConversionResult[]>([]);
   const [convertedFiles, setConvertedFiles] = useState<ConversionResult[]>([]);
@@ -51,8 +53,12 @@ export function ConversionFlow({ onComplete, onDone }: ConversionFlowProps) {
   const handleConversionComplete = (results: ConversionResult[]) => {
     setStep("result");
     setConvertedFiles(results);
-    onComplete(results);
   };
+  
+  const handleBackToUpload = () => {
+    setFilesToConvert([]);
+    setStep("upload");
+  }
 
   const handleReset = () => {
     setFilesToConvert([]);
@@ -66,6 +72,33 @@ export function ConversionFlow({ onComplete, onDone }: ConversionFlowProps) {
     handleReset();
   }
 
+  const handleCloseRequest = () => {
+    // Don't show confirmation on the final step
+    if (step === 'result' || step === 'upload') {
+        onDone([]); // Pass empty array to signify cancellation
+        handleReset();
+        return;
+    }
+    setIsCancelAlertOpen(true);
+  }
+
+  const handleConfirmCancel = () => {
+    onDone([]);
+    handleReset();
+    setIsCancelAlertOpen(false);
+  }
+
+  const getTitleForStep = () => {
+    switch(step) {
+        case "upload": return "Upload Files";
+        case "config": return "Configure Conversion";
+        case "progress": return "Converting...";
+        case "result": return "Conversion Complete";
+        default: return "LexiConvert";
+    }
+  }
+
+
   const renderStep = () => {
     switch(step) {
       case "upload":
@@ -75,23 +108,15 @@ export function ConversionFlow({ onComplete, onDone }: ConversionFlowProps) {
           <FileConfigStep
             files={filesToConvert}
             onConfigComplete={handleConfigComplete}
-            onBack={handleReset}
+            onBack={handleBackToUpload}
           />
         );
       case "progress":
-        // Desktop: show in a dialog. On mobile, it will be a full screen takeover implicitly.
-        // The dialog is controlled by the step, so it opens when step becomes 'progress'.
-        // We don't want the user to close it accidentally.
         return (
-           <Dialog open={true} onOpenChange={() => {}}>
-            <DialogContent hideCloseButton={true} className="p-0 bg-transparent border-0 max-w-lg">
-               <ConversionProgressStep
-                  tasks={filesToConvert}
-                  onConversionComplete={handleConversionComplete}
-                  onCancelRequest={() => setIsCancelAlertOpen(true)}
-                />
-            </DialogContent>
-           </Dialog>
+           <ConversionProgressStep
+              tasks={filesToConvert}
+              onConversionComplete={handleConversionComplete}
+            />
         );
       case "result":
          return <ConversionResultStep results={convertedFiles} onDone={handleDone} />;
@@ -100,9 +125,32 @@ export function ConversionFlow({ onComplete, onDone }: ConversionFlowProps) {
     }
   }
 
+  const showBackButton = step === 'config';
+
   return (
-    <div className="w-full">
-      {renderStep()}
+    <div className="h-full flex flex-col">
+       <DialogHeader className="p-6 pb-4 border-b">
+            <div className="flex justify-between items-center">
+                 <div className="flex items-center gap-4">
+                    {showBackButton && (
+                        <Button variant="ghost" size="icon" onClick={handleBackToUpload}>
+                            <ArrowLeft className="h-5 w-5" />
+                        </Button>
+                    )}
+                    <DialogTitle className="text-2xl">{getTitleForStep()}</DialogTitle>
+                 </div>
+                 <DialogClose asChild>
+                    <button onClick={handleCloseRequest}>
+                        <X className="h-5 w-5" />
+                        <span className="sr-only">Close</span>
+                    </button>
+                </DialogClose>
+            </div>
+        </DialogHeader>
+      
+      <div className="flex-grow p-6 overflow-y-auto">
+        {renderStep()}
+      </div>
 
       <AlertDialog open={isCancelAlertOpen} onOpenChange={setIsCancelAlertOpen}>
         <AlertDialogContent>
@@ -114,7 +162,7 @@ export function ConversionFlow({ onComplete, onDone }: ConversionFlowProps) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep Converting</AlertDialogCancel>
-            <AlertDialogAction onClick={handleReset}>Cancel Conversion</AlertDialogAction>
+            <AlertDialogAction onClick={handleConfirmCancel}>Cancel Conversion</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
