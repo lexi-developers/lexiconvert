@@ -122,30 +122,55 @@ export function FilePreview({ file, fileName, isOpen, onClose }: FilePreviewProp
     }
     
     if (isImage && fileUrl) {
-      return <img src={fileUrl} alt={`Preview of ${fileName}`} className="max-w-full max-h-[75vh] object-contain" />;
+      return <img src={fileUrl} alt={`Preview of ${fileName}`} className="max-w-full max-h-[85vh] object-contain" />;
     }
     
     if (isPdf && fileUrl) {
         return (
-            <Document
-                file={fileUrl}
-                onLoadSuccess={onDocumentLoadSuccess}
-                onLoadError={(err) => setError(`Failed to load PDF: ${err.message}`)}
-                loading={
-                    <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
-                        <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
-                        <p className="mt-4 text-muted-foreground">Loading PDF...</p>
+            <div className="flex flex-col items-center gap-4">
+                <Document
+                    file={fileUrl}
+                    onLoadSuccess={onDocumentLoadSuccess}
+                    onLoadError={(err) => setError(`Failed to load PDF: ${err.message}`)}
+                    loading={
+                        <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
+                            <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
+                            <p className="mt-4 text-muted-foreground">Loading PDF...</p>
+                        </div>
+                    }
+                >
+                    <Page pageNumber={pageNumber} />
+                </Document>
+                {numPages && numPages > 1 && (
+                    <div className="flex items-center gap-4 py-2">
+                        <Button 
+                            variant="outline" 
+                            size="icon" 
+                            onClick={() => setPageNumber(p => p - 1)} 
+                            disabled={pageNumber <= 1}
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm text-muted-foreground">
+                            Page {pageNumber} of {numPages}
+                        </span>
+                        <Button 
+                            variant="outline" 
+                            size="icon" 
+                            onClick={() => setPageNumber(p => p + 1)}
+                            disabled={pageNumber >= numPages}
+                        >
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
                     </div>
-                }
-            >
-                <Page pageNumber={pageNumber} />
-            </Document>
+                )}
+            </div>
         )
     }
 
     if (isText && content) {
       return (
-        <pre className="text-sm bg-muted p-4 rounded-md max-h-[70vh] overflow-auto whitespace-pre-wrap break-words">
+        <pre className="text-sm bg-muted p-4 rounded-md max-h-[80vh] overflow-auto whitespace-pre-wrap break-words w-full">
           <code>{content}</code>
         </pre>
       );
@@ -156,40 +181,13 @@ export function FilePreview({ file, fileName, isOpen, onClose }: FilePreviewProp
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl w-full">
-        <DialogHeader>
-          <DialogTitle className="truncate">{fileName}</DialogTitle>
-        </DialogHeader>
-        <div className="flex items-center justify-center py-4 min-h-[400px] bg-gray-100/50 dark:bg-gray-800/50">
-            {renderContent()}
-        </div>
-        <DialogFooter className="flex-row justify-between items-center w-full">
-            {isPdf && numPages && (
-                <div className="flex items-center gap-4">
-                    <Button 
-                        variant="outline" 
-                        size="icon" 
-                        onClick={() => setPageNumber(p => p - 1)} 
-                        disabled={pageNumber <= 1}
-                    >
-                        <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                        Page {pageNumber} of {numPages}
-                    </span>
-                    <Button 
-                        variant="outline" 
-                        size="icon" 
-                        onClick={() => setPageNumber(p => p + 1)}
-                        disabled={pageNumber >= numPages}
-                    >
-                        <ChevronRight className="h-4 w-4" />
-                    </Button>
-                </div>
-            )}
-            <div/>
-             <Button variant="outline" onClick={onClose}>Close</Button>
-        </DialogFooter>
+        <DialogContent className="max-w-4xl w-full h-[95vh] flex flex-col">
+            <DialogHeader>
+            <DialogTitle className="truncate pr-8">{fileName}</DialogTitle>
+            </DialogHeader>
+            <div className="flex-grow flex items-center justify-center py-4 overflow-y-auto bg-gray-100/50 dark:bg-gray-800/50 rounded-md">
+                {renderContent()}
+            </div>
       </DialogContent>
     </Dialog>
   );
