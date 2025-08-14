@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { FileHistory } from "@/components/file-history";
 import { ConversionFlow } from "@/components/conversion-flow";
@@ -26,8 +26,18 @@ export type ConversionResult = {
 };
 
 export default function Home() {
-  const [view, setView] = useState<View>("history");
   const [history, setHistory] = useState<ConversionResult[]>([]);
+  const [view, setView] = useState<View>("history");
+
+  // On initial load, if there's no history, go directly to the conversion view.
+  useEffect(() => {
+    if (history.length === 0) {
+      setView("conversion");
+    } else {
+      setView("history");
+    }
+  }, [history.length]);
+
 
   const handleConversionComplete = (results: ConversionResult[]) => {
     // This function is now primarily for potential future use, like logging.
@@ -67,8 +77,8 @@ export default function Home() {
           )}
         </header>
 
-        {view === "history" ? (
-          <FileHistory history={history} onNewConversion={() => setView("conversion")} />
+        {view === "history" && history.length > 0 ? (
+          <FileHistory history={history} />
         ) : (
           <ConversionFlow onComplete={handleConversionComplete} onDone={handleFlowDone} />
         )}

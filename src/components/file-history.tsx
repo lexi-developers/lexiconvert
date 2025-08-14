@@ -9,33 +9,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus } from "lucide-react";
 import { ConversionResult } from "@/app/page";
 import { getFileIcon } from "@/lib/icons";
-import { Button } from "./ui/button";
 
 interface FileHistoryProps {
   history: ConversionResult[];
-  onNewConversion: () => void;
 }
 
-export function FileHistory({ history, onNewConversion }: FileHistoryProps) {
-  if (history.length === 0) {
-    return (
-      <div className="text-center py-20 bg-muted/20 rounded-lg flex items-center justify-center">
-        <Button 
-          size="lg"
-          variant="outline" 
-          className="rounded-full h-20 w-20" 
-          onClick={onNewConversion}
-        >
-          <Plus className="h-10 w-10" />
-          <span className="sr-only">New Conversion</span>
-        </Button>
-      </div>
-    );
-  }
-
+export function FileHistory({ history }: FileHistoryProps) {
   // Create a Set of seen IDs to filter out duplicates
   const seen = new Set();
   const uniqueHistory = history.filter(item => {
@@ -43,7 +24,6 @@ export function FileHistory({ history, onNewConversion }: FileHistoryProps) {
     seen.add(item.id);
     return !duplicate;
   });
-
 
   return (
     <div className="border rounded-lg">
