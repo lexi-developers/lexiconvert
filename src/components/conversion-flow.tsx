@@ -9,6 +9,7 @@ import { ConversionProgressStep } from "./conversion-progress-step";
 import { ConversionResultStep } from "./conversion-result-step";
 import { Button } from "./ui/button";
 import { generateUniqueId } from "@/lib/conversions";
+import { ArrowLeft } from "lucide-react";
 
 type FlowStep = "upload" | "config" | "progress" | "result";
 
@@ -65,7 +66,10 @@ export function ConversionFlow({ onComplete, onDone }: ConversionFlowProps) {
     <div className="w-full">
         {step !== 'upload' && (
             <div className="mb-4">
-                <Button variant="outline" onClick={handleCancel}>Back to History</Button>
+                <Button variant="ghost" onClick={handleCancel}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to History
+                </Button>
             </div>
         )}
       {step === "upload" && <FileUploadStep onFilesSelected={handleFilesSelected} />}
@@ -73,7 +77,7 @@ export function ConversionFlow({ onComplete, onDone }: ConversionFlowProps) {
         <FileConfigStep
           files={filesToConvert}
           onConfigComplete={handleConfigComplete}
-          onBack={handleCancel}
+          onBack={handleReset}
         />
       )}
       {step === "progress" && (

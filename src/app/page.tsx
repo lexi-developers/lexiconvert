@@ -6,6 +6,12 @@ import { Plus } from "lucide-react";
 import { FileHistory } from "@/components/file-history";
 import { ConversionFlow } from "@/components/conversion-flow";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 type View = "history" | "conversion";
 
@@ -45,10 +51,19 @@ export default function Home() {
             </h1>
           </div>
           {view === "history" && (
-            <Button size="lg" onClick={() => setView("conversion")}>
-              <Plus className="mr-2 h-5 w-5" />
-              New Conversion
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon" variant="outline" className="rounded-full" onClick={() => setView("conversion")}>
+                    <Plus className="h-5 w-5" />
+                    <span className="sr-only">New Conversion</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>New Conversion</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </header>
 

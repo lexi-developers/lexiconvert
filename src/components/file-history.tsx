@@ -22,9 +22,9 @@ export function FileHistory({ history }: FileHistoryProps) {
     return (
       <div className="text-center py-20 bg-muted/50 rounded-lg">
         <File className="mx-auto h-12 w-12 text-muted-foreground" />
-        <h3 className="mt-4 text-lg font-medium">No Conversion History</h3>
+        <h3 className="mt-4 text-lg font-medium">No Conversions Yet</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Click "New Conversion" in the top right to start your first file conversion.
+          Click the "+" button to start a new conversion.
         </p>
       </div>
     );

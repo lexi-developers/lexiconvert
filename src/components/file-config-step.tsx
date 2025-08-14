@@ -6,7 +6,7 @@ import { ConversionResult } from '@/app/page';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, ArrowRight, Trash2 } from 'lucide-react';
+import { ArrowRight, Trash2, ArrowLeft } from 'lucide-react';
 import { getFileExtension, getFileTypeFromMime, supportedConversions, OutputFormat } from '@/lib/conversions';
 import { getFileIcon } from '@/lib/icons';
 
@@ -41,10 +41,22 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
     if(tasks.length === 0) return true;
     return tasks.some(task => !task.outputFileType);
   }, [tasks]);
+  
+  if (tasks.length === 0) {
+    return (
+        <div className="text-center p-12 bg-muted/50 rounded-lg">
+            <p className="text-muted-foreground mb-4">All files have been removed.</p>
+             <Button variant="outline" onClick={onBack}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Go Back to Upload
+            </Button>
+        </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
-       <h2 className="text-2xl font-semibold">Configure Conversion Options</h2>
+       <h2 className="text-2xl font-semibold">Configure Conversion</h2>
        <div className="border rounded-lg">
         <Table>
             <TableHeader>
@@ -68,7 +80,7 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
                             {getFileIcon(task.inputFile.name, task.inputFile.type)}
                         </div>
                     </TableCell>
-                    <TableCell className="font-medium">{task.inputFile.name}</TableCell>
+                    <TableCell className="font-medium truncate max-w-xs">{task.inputFile.name}</TableCell>
                     <TableCell>{(task.inputFile.size / 1024).toFixed(2)} KB</TableCell>
                     <TableCell>
                     <Select
@@ -92,7 +104,8 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
                     </TableCell>
                     <TableCell className="text-right">
                          <Button variant="ghost" size="icon" onClick={() => handleRemoveTask(task.id)}>
-                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                            <span className="sr-only">Remove</span>
                         </Button>
                     </TableCell>
                 </TableRow>
@@ -100,18 +113,9 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
             })}
             </TableBody>
         </Table>
-        {tasks.length === 0 && (
-            <div className="text-center p-8">
-                <p className="text-muted-foreground">All files have been removed. Go back to re-upload.</p>
-            </div>
-        )}
       </div>
 
-      <div className="flex justify-between items-center">
-        <Button variant="outline" onClick={onBack}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Upload
-        </Button>
+      <div className="flex justify-end items-center">
         <Button size="lg" onClick={() => onConfigComplete(tasks)} disabled={isNextDisabled}>
           Start Conversion
           <ArrowRight className="ml-2 h-4 w-4" />
