@@ -2,18 +2,45 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { UploadCloud, FolderUp, ArrowRight, Trash2, FileUp } from "lucide-react";
+import { UploadCloud, FolderUp, ArrowRight, Trash2, FileUp, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import JSZip from 'jszip';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePreview } from "@/context/preview-provider";
+import { motion, AnimatePresence } from "framer-motion";
 
 
 interface FileUploadStepProps {
   onFilesSelected: (files: File[]) => void;
 }
+
+const listVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+  },
+  exit: {
+    x: -50,
+    opacity: 0,
+    transition: {
+      duration: 0.2
+    }
+  }
+};
+
 
 export function FileUploadStep({ onFilesSelected }: FileUploadStepProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -163,9 +190,19 @@ export function FileUploadStep({ onFilesSelected }: FileUploadStepProps) {
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <motion.tbody
+                variants={listVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                <AnimatePresence>
                 {stagedFiles.map((file, index) => (
-                  <TableRow key={`${file.name}-${file.size}-${index}`}>
+                  <motion.tr 
+                    key={`${file.name}-${file.size}-${index}`}
+                    variants={itemVariants}
+                    exit="exit"
+                    layout
+                  >
                     <TableCell className="font-medium truncate max-w-sm">
                         <span 
                             className="cursor-pointer hover:underline" 
@@ -181,9 +218,10 @@ export function FileUploadStep({ onFilesSelected }: FileUploadStepProps) {
                         <span className="sr-only">Remove</span>
                       </Button>
                     </TableCell>
-                  </TableRow>
+                  </motion.tr>
                 ))}
-              </TableBody>
+                </AnimatePresence>
+              </motion.tbody>
             </Table>
           </div>
           <div className="flex justify-end">
@@ -222,24 +260,4 @@ export function FileUploadStep({ onFilesSelected }: FileUploadStepProps) {
       )}
     </div>
   );
-}
-
-// Simple loader icon
-function Loader2(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
-  )
 }

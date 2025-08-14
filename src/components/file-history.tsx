@@ -24,6 +24,7 @@ import { ConversionResult } from "@/app/page";
 import { getFileIcon } from "@/lib/icons";
 import { usePreview } from "@/context/preview-provider";
 import { deleteConversion } from "@/lib/db";
+import { motion } from "framer-motion";
 
 interface FileHistoryProps {
   history: ConversionResult[];
@@ -36,6 +37,29 @@ const getOutputFilename = (inputFile: File, outputFileType?: string): string => 
     const nameWithoutExtension = inputFile.name.split('.').slice(0, -1).join('.');
     return `${nameWithoutExtension || 'converted'}.${outputFileType}`;
 };
+
+const listVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      type: "spring",
+      stiffness: 100,
+    },
+  },
+};
+
 
 export function FileHistory({ history, setHistory, onDelete }: FileHistoryProps) {
   const { showPreview } = usePreview();
@@ -177,9 +201,18 @@ export function FileHistory({ history, setHistory, onDelete }: FileHistoryProps)
                 </TableHead>
             </TableRow>
             </TableHeader>
-            <TableBody>
+            <motion.tbody
+                variants={listVariants}
+                initial="hidden"
+                animate="visible"
+            >
             {uniqueHistory.map((item) => (
-                <TableRow key={item.id} data-state={selectedItems.has(item.id) ? "selected" : ""}>
+                <motion.tr
+                    key={item.id}
+                    variants={itemVariants}
+                    className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                    data-state={selectedItems.has(item.id) ? "selected" : ""}
+                >
                  <TableCell>
                     <Checkbox
                         checked={selectedItems.has(item.id)}
@@ -223,9 +256,9 @@ export function FileHistory({ history, setHistory, onDelete }: FileHistoryProps)
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
-                </TableRow>
+                </motion.tr>
             ))}
-            </TableBody>
+            </motion.tbody>
         </Table>
         </div>
     </div>

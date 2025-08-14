@@ -18,6 +18,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 import { OnboardingDialog } from "@/components/settings/onboarding-dialog";
 import { SettingsDialog } from "@/components/settings/settings-dialog";
 import { LockScreen } from "@/components/settings/lock-screen";
+import { motion } from "framer-motion";
 
 
 export type ConversionResult = {
@@ -139,9 +140,19 @@ export default function Home() {
               <p>Loading history...</p>
             </div>
         ) : history.length > 0 ? (
-          <FileHistory history={history} setHistory={setHistory} onDelete={handleDeleteFromHistory} />
+          <motion.div
+             initial={{ opacity: 0, y: 20 }}
+             animate={{ opacity: 1, y: 0 }}
+             transition={{ duration: 0.5 }}
+          >
+            <FileHistory history={history} setHistory={setHistory} onDelete={handleDeleteFromHistory} />
+          </motion.div>
         ) : (
-          <div className="flex items-center justify-center h-[60vh]">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.7, delay: 0.2 }}
+            className="flex items-center justify-center h-[60vh]">
             <div className="text-center p-8 border border-dashed rounded-lg">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                     <FileUp className="h-6 w-6 text-muted-foreground" />
@@ -157,7 +168,7 @@ export default function Home() {
                     </Button>
                 </div>
             </div>
-        </div>
+        </motion.div>
         )}
 
       </div>
@@ -173,4 +184,3 @@ export default function Home() {
     </main>
   );
 }
-
