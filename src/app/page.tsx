@@ -19,6 +19,7 @@ import { OnboardingDialog } from "@/components/settings/onboarding-dialog";
 import { SettingsDialog } from "@/components/settings/settings-dialog";
 import { LockScreen } from "@/components/settings/lock-screen";
 import { motion } from "framer-motion";
+import { usePasswordManager } from "@/hooks/use-password-manager";
 
 
 export type ConversionResult = {
@@ -39,13 +40,19 @@ export default function Home() {
   
   const [hasOnboarded, setHasOnboarded] = useLocalStorage("hasOnboarded", false);
   const [isClient, setIsClient] = useState(false)
-  const [password] = useLocalStorage<string | null>('app-password', null);
-  const [isUnlocked, setIsUnlocked] = useState(!password);
+  const { passwordExists } = usePasswordManager();
+  const [isUnlocked, setIsUnlocked] = useState(!passwordExists);
 
 
   useEffect(() => {
-    setIsClient(true)
-    if (isUnlocked) {
+    setIsClient(true);
+    // This effect ensures that if a password exists, the user is forced to the lock screen.
+    // It also handles the case where a password is removed.
+    setIsUnlocked(!passwordExists);
+  }, [passwordExists]);
+  
+  useEffect(() => {
+    if (isUnlocked && hasOnboarded) {
       const loadHistory = async () => {
         setIsLoading(true);
         const storedConversions = await getAllConversions();
@@ -54,7 +61,7 @@ export default function Home() {
       };
       loadHistory();
     }
-  }, [isUnlocked]);
+  }, [isUnlocked, hasOnboarded]);
   
   const refreshHistory = async () => {
     setIsLoading(true);
@@ -86,13 +93,13 @@ export default function Home() {
         </div>
     );
   }
-  
-  if (!isUnlocked) {
-    return <LockScreen onUnlock={() => setIsUnlocked(true)} />;
-  }
 
   if (!hasOnboarded) {
     return <OnboardingDialog onComplete={handleOnboardingComplete} />;
+  }
+  
+  if (!isUnlocked) {
+    return <LockScreen onUnlock={() => setIsUnlocked(true)} />;
   }
 
 

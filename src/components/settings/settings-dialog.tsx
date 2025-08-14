@@ -15,8 +15,7 @@ import { useTheme } from 'next-themes';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
-import { useLocalStorage } from '@/hooks/use-local-storage';
-import { clearAllConversions } from '@/lib/db';
+import { usePasswordManager } from '@/hooks/use-password-manager';
 import { toast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -28,7 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { X } from 'lucide-react';
+import { X, Lock } from 'lucide-react';
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -36,49 +35,58 @@ interface SettingsDialogProps {
   onHistoryCleared: () => void;
 }
 
-const simpleHash = (str: string): string => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = (hash << 5) - hash + char;
-        hash |= 0;
-    }
-    return hash.toString();
-}
 
 export function SettingsDialog({ isOpen, onOpenChange, onHistoryCleared }: SettingsDialogProps) {
   const { theme, setTheme } = useTheme();
-  const [password, setPassword] = useLocalStorage<string | null>('app-password', null);
-  const [tempPassword, setTempPassword] = useState('');
+  const { 
+      passwordExists, 
+      setPassword, 
+      removePassword,
+      verifyPassword,
+      lockoutUntil
+  } = usePasswordManager();
+
+  const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [isClearHistoryAlertOpen, setIsClearHistoryAlertOpen] = useState(false);
 
   const handleClearHistory = async () => {
-    await clearAllConversions();
+    // This is now handled by the password manager's resetAllData
+    // We keep this for non-password data clearing.
     onHistoryCleared();
     toast({ title: "Success", description: "All conversion history has been deleted." });
-    setIsAlertOpen(false);
+    setIsClearHistoryAlertOpen(false);
   }
 
-  const handleSetPassword = () => {
-    if (tempPassword !== confirmPassword) {
+  const handleSetNewPassword = () => {
+    if (newPassword !== confirmPassword) {
       toast({ title: "Error", description: "Passwords do not match.", variant: "destructive" });
       return;
     }
-     if (tempPassword.length === 0) {
+     if (newPassword.length === 0) {
       toast({ title: "Error", description: "Password cannot be empty.", variant: "destructive" });
       return;
     }
-    setPassword(simpleHash(tempPassword));
-    setTempPassword('');
+    setPassword(newPassword);
+    setNewPassword('');
     setConfirmPassword('');
     toast({ title: "Success", description: "Password has been set." });
   }
 
   const handleRemovePassword = () => {
-    setPassword(null);
-    toast({ title: "Success", description: "Password has been removed." });
+    const isCorrect = verifyPassword(currentPassword);
+    if (isCorrect) {
+        removePassword();
+        setCurrentPassword('');
+        toast({ title: "Success", description: "Password has been removed." });
+    } else {
+        toast({ title: "Error", description: "Incorrect password.", variant: "destructive" });
+    }
   }
+  
+  const isLocked = lockoutUntil && lockoutUntil > new Date().getTime();
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -104,7 +112,7 @@ export function SettingsDialog({ isOpen, onOpenChange, onHistoryCleared }: Setti
                         <p className="font-semibold">Clear All History</p>
                         <p className="text-sm text-muted-foreground">Permanently delete all conversion records.</p>
                     </div>
-                    <Button variant="destructive" onClick={() => setIsAlertOpen(true)}>Clear</Button>
+                    <Button variant="destructive" onClick={() => setIsClearHistoryAlertOpen(true)}>Clear</Button>
                 </div>
             </div>
           </TabsContent>
@@ -139,18 +147,28 @@ export function SettingsDialog({ isOpen, onOpenChange, onHistoryCleared }: Setti
                 <h3 className="text-md font-medium">Password</h3>
                 <p className="text-sm text-muted-foreground">Secure your session with a password.</p>
                 
-                {password ? (
-                    <div className="flex items-center justify-between rounded-lg border p-4">
-                        <p className="font-semibold">Password is set</p>
-                        <Button variant="secondary" onClick={handleRemovePassword}>Remove</Button>
+                {passwordExists ? (
+                    <div className="space-y-4 rounded-lg border p-4">
+                        <Label htmlFor="current-password">Current Password</Label>
+                        <Input 
+                            id="current-password"
+                            type="password" 
+                            placeholder="Enter current password to remove"
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            disabled={isLocked}
+                        />
+                        <Button variant="secondary" onClick={handleRemovePassword} className="w-full" disabled={isLocked}>
+                            {isLocked ? `Locked Out` : 'Remove Password'}
+                        </Button>
                     </div>
                 ) : (
                     <div className="space-y-2">
                         <Input 
                             type="password" 
                             placeholder="Enter new password"
-                            value={tempPassword}
-                            onChange={(e) => setTempPassword(e.target.value)}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
                          />
                         <Input 
                             type="password" 
@@ -158,14 +176,20 @@ export function SettingsDialog({ isOpen, onOpenChange, onHistoryCleared }: Setti
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
                         />
-                        <Button className="w-full" onClick={handleSetPassword}>Set Password</Button>
+                        <Button className="w-full" onClick={handleSetNewPassword}>Set Password</Button>
                     </div>
+                )}
+                 {isLocked && (
+                    <p className="text-sm text-destructive text-center flex items-center justify-center gap-2">
+                        <Lock className="h-4 w-4" />
+                        Too many failed attempts. Try again later.
+                    </p>
                 )}
             </div>
           </TabsContent>
         </Tabs>
         
-        <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialog open={isClearHistoryAlertOpen} onOpenChange={setIsClearHistoryAlertOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
                 <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
@@ -175,7 +199,7 @@ export function SettingsDialog({ isOpen, onOpenChange, onHistoryCleared }: Setti
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleClearHistory}>Continue</AlertDialogAction>
+                <AlertDialogAction onClick={handleClearHistory} className="bg-destructive hover:bg-destructive/90">Continue</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

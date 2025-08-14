@@ -8,22 +8,13 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useLocalStorage } from '@/hooks/use-local-storage';
+import { usePasswordManager } from '@/hooks/use-password-manager';
 import { CheckCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { AnimatePresence, motion } from 'framer-motion';
 
 interface OnboardingDialogProps {
     onComplete: () => void;
-}
-
-const simpleHash = (str: string): string => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = (hash << 5) - hash + char;
-        hash |= 0; 
-    }
-    return hash.toString();
 }
 
 const stepVariants = {
@@ -36,7 +27,7 @@ const stepVariants = {
 export function OnboardingDialog({ onComplete }: OnboardingDialogProps) {
     const [step, setStep] = useState(1);
     const { setTheme } = useTheme();
-    const [password, setPassword] = useLocalStorage<string | null>('app-password', null);
+    const { setPassword } = usePasswordManager();
     const [tempPassword, setTempPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -52,13 +43,12 @@ export function OnboardingDialog({ onComplete }: OnboardingDialogProps) {
             return;
         }
         if (tempPassword.length > 0) {
-            setPassword(simpleHash(tempPassword));
+            setPassword(tempPassword);
         }
         handleNext();
     }
     
     const handleSkipPassword = () => {
-        setPassword(null);
         handleNext();
     }
     
