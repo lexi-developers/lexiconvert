@@ -64,8 +64,7 @@ export default function Home() {
           <FileHistory history={history} />
         ) : (
           <div className="text-center py-24">
-             <h2 className="text-2xl font-semibold text-gray-700">Welcome to LexiConvert!</h2>
-             <p className="mt-2 text-muted-foreground">立即開始你的轉換</p>
+             <h2 className="text-2xl font-semibold text-muted-foreground">立即開始你的轉換</h2>
           </div>
         )}
 
