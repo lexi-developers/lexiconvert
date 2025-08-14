@@ -139,7 +139,10 @@ export function ConversionFlow({ onDone }: ConversionFlowProps) {
                     <DialogTitle className="text-2xl">{getTitleForStep()}</DialogTitle>
                  </div>
                  <DialogClose asChild>
-                    <button onClick={handleCloseRequest}>
+                    <button onClick={(e) => {
+                        e.preventDefault();
+                        handleCloseRequest();
+                    }}>
                         <X className="h-5 w-5" />
                         <span className="sr-only">Close</span>
                     </button>
