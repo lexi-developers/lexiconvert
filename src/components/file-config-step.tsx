@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ConversionResult } from '@/app/page';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,12 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
     })
   );
 
+  useEffect(() => {
+    if (tasks.length === 0) {
+        onBack();
+    }
+  }, [tasks, onBack]);
+
   const handleFormatChange = (id: string, newFormat: OutputFormat) => {
     setTasks(tasks.map(task => (task.id === id ? { ...task, outputFileType: newFormat } : task)));
   };
@@ -42,17 +48,18 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
     return tasks.some(task => !task.outputFileType);
   }, [tasks]);
   
-  if (tasks.length === 0) {
-    return (
-        <div className="text-center p-12 bg-muted/50 rounded-lg">
-            <p className="text-muted-foreground mb-4">All files have been removed.</p>
-             <Button variant="outline" onClick={onBack}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Go Back to Upload
-            </Button>
-        </div>
-    )
-  }
+  // This part is no longer needed as the useEffect handles it automatically.
+  // if (tasks.length === 0) {
+  //   return (
+  //       <div className="text-center p-12 bg-muted/50 rounded-lg">
+  //           <p className="text-muted-foreground mb-4">All files have been removed.</p>
+  //            <Button variant="outline" onClick={onBack}>
+  //               <ArrowLeft className="mr-2 h-4 w-4" />
+  //               Go Back to Upload
+  //           </Button>
+  //       </div>
+  //   )
+  // }
 
   return (
     <div className="space-y-6">
