@@ -68,12 +68,12 @@ export const supportedConversions: Record<FileType, OutputFormat[]> = {
   txt: ["pdf"],
   epub: ["pdf"],
   // Images
-  jpg: ["pdf", "png", "webp", "gif", "bmp", "svg"],
-  png: ["pdf", "jpg", "webp", "gif", "bmp", "svg"],
-  gif: ["pdf", "jpg", "png", "webp", "bmp"],
-  bmp: ["pdf", "jpg", "png", "webp", "gif", "svg"],
-  webp: ["pdf", "jpg", "png", "gif", "bmp", "svg"],
-  svg: ["pdf", "png", "jpg"],
+  jpg: ["png", "pdf", "webp", "gif", "bmp", "svg"],
+  png: ["jpg", "pdf", "webp", "gif", "bmp", "svg"],
+  gif: ["png", "pdf", "jpg", "webp", "bmp"],
+  bmp: ["png", "pdf", "jpg", "webp", "gif", "svg"],
+  webp: ["png", "pdf", "jpg", "gif", "bmp", "svg"],
+  svg: ["png", "pdf", "jpg"],
   // Text-based
   html: ["pdf"],
   xml: ["pdf"],
