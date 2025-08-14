@@ -13,10 +13,10 @@ type FlowStep = "upload" | "config" | "progress" | "result";
 
 interface ConversionFlowProps {
   onComplete: (results: ConversionResult[]) => void;
-  onCancel: () => void;
+  onDone: () => void;
 }
 
-export function ConversionFlow({ onComplete, onCancel }: ConversionFlowProps) {
+export function ConversionFlow({ onComplete, onDone }: ConversionFlowProps) {
   const [step, setStep] = useState<FlowStep>("upload");
   const [filesToConvert, setFilesToConvert] = useState<ConversionResult[]>([]);
   const [convertedFiles, setConvertedFiles] = useState<ConversionResult[]>([]);
@@ -47,12 +47,17 @@ export function ConversionFlow({ onComplete, onCancel }: ConversionFlowProps) {
     setConvertedFiles([]);
     setStep("upload");
   };
+  
+  const handleCancel = () => {
+    handleReset();
+    onDone();
+  }
 
   return (
     <div className="w-full">
         {step !== 'upload' && (
             <div className="mb-4">
-                <Button variant="outline" onClick={onCancel}>返回歷史記錄</Button>
+                <Button variant="outline" onClick={onDone}>返回歷史記錄</Button>
             </div>
         )}
       {step === "upload" && <FileUploadStep onFilesSelected={handleFilesSelected} />}
@@ -70,7 +75,7 @@ export function ConversionFlow({ onComplete, onCancel }: ConversionFlowProps) {
         />
       )}
       {step === "result" && (
-        <ConversionResultStep results={convertedFiles} onDone={onCancel} />
+        <ConversionResultStep results={convertedFiles} onDone={onDone} />
       )}
     </div>
   );

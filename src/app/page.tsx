@@ -23,9 +23,15 @@ export default function Home() {
   const [history, setHistory] = useState<ConversionResult[]>([]);
 
   const handleConversionComplete = (results: ConversionResult[]) => {
+    // Only update history, don't change the view here.
+    // The ConversionFlow component will now handle navigating away
+    // from the results page.
     setHistory((prev) => [...results, ...prev]);
-    setView("history");
   };
+
+  const handleFlowDone = () => {
+    setView("history");
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-start p-4 sm:p-8 md:p-12 bg-background">
@@ -50,7 +56,7 @@ export default function Home() {
         {view === "history" ? (
           <FileHistory history={history} />
         ) : (
-          <ConversionFlow onComplete={handleConversionComplete} onCancel={() => setView("history")} />
+          <ConversionFlow onComplete={handleConversionComplete} onDone={handleFlowDone} />
         )}
 
         <footer className="text-center mt-12 text-sm text-muted-foreground">
