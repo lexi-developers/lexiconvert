@@ -1,3 +1,4 @@
+
 import type {NextConfig} from 'next';
 import { IgnorePlugin } from 'webpack';
 
@@ -26,8 +27,9 @@ const nextConfig: NextConfig = {
         contextRegExp: /jsdom$/,
       })
     );
-    // Setting an alias for pdfjs-dist to avoid server-side issues
-    config.resolve.alias['pdfjs-dist'] = 'pdfjs-dist/build/pdf';
+    // The alias below is removed as it's not the correct way to handle
+    // the pdf.js worker in recent Next.js versions and causes build failures.
+    // The library handles its worker pathing correctly now with the new URL() import.
     return config;
   },
 };
