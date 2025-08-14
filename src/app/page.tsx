@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, FileUp } from "lucide-react";
 import { FileHistory } from "@/components/file-history";
 import { ConversionFlow } from "@/components/conversion-flow";
@@ -13,6 +13,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { getAllConversions, deleteConversion } from "@/lib/db";
+
 
 export type ConversionResult = {
   id: string;
@@ -27,14 +29,47 @@ export type ConversionResult = {
 export default function Home() {
   const [history, setHistory] = useState<ConversionResult[]>([]);
   const [isConversionFlowOpen, setIsConversionFlowOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      setIsLoading(true);
+      const storedConversions = await getAllConversions();
+      setHistory(storedConversions.sort((a, b) => parseInt(b.id.split('-')[1]) - parseInt(a.id.split('-')[1])));
+      setIsLoading(false);
+    };
+    loadHistory();
+  }, []);
 
   const handleFlowDone = (results: ConversionResult[] = []) => {
-    // Add the new results to the history and close the dialog.
     if (results.length > 0) {
-      setHistory((prev) => [...results, ...prev]);
+      // Since results are now saved to DB within the flow, we just need to re-read
+       const loadHistory = async () => {
+        const storedConversions = await getAllConversions();
+        setHistory(storedConversions.sort((a, b) => parseInt(b.id.split('-')[1]) - parseInt(a.id.split('-')[1])));
+      };
+      loadHistory();
     }
     setIsConversionFlowOpen(false);
   }
+
+  const handleSetHistory = (newHistory: ConversionResult[] | ((prev: ConversionResult[]) => ConversionResult[])) => {
+    if (typeof newHistory === 'function') {
+      setHistory(prev => {
+        const updated = newHistory(prev);
+        // This is tricky to sync with DB. For now, deletions are handled separately.
+        return updated;
+      });
+    } else {
+      setHistory(newHistory);
+    }
+  }
+
+  const handleDeleteFromHistory = async (id: string) => {
+    await deleteConversion(id);
+    setHistory(prev => prev.filter(item => item.id !== id));
+  }
+
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-start p-4 sm:p-8 md:p-12 bg-background">
@@ -60,8 +95,12 @@ export default function Home() {
           </TooltipProvider>
         </header>
 
-        {history.length > 0 ? (
-          <FileHistory history={history} setHistory={setHistory} />
+        {isLoading ? (
+            <div className="flex items-center justify-center h-[60vh]">
+              <p>Loading history...</p>
+            </div>
+        ) : history.length > 0 ? (
+          <FileHistory history={history} setHistory={handleSetHistory} onDelete={handleDeleteFromHistory} />
         ) : (
           <div className="flex items-center justify-center h-[60vh]">
             <div className="text-center p-8 border border-dashed rounded-lg">

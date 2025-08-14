@@ -27,6 +27,7 @@ import { usePreview } from "@/context/preview-provider";
 interface FileHistoryProps {
   history: ConversionResult[];
   setHistory: React.Dispatch<React.SetStateAction<ConversionResult[]>>;
+  onDelete: (id: string) => void;
 }
 
 const getOutputFilename = (inputFile: File, outputFileType?: string): string => {
@@ -35,7 +36,7 @@ const getOutputFilename = (inputFile: File, outputFileType?: string): string => 
     return `${nameWithoutExtension || 'converted'}.${outputFileType}`;
 };
 
-export function FileHistory({ history, setHistory }: FileHistoryProps) {
+export function FileHistory({ history, setHistory, onDelete }: FileHistoryProps) {
   const { showPreview } = usePreview();
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
@@ -78,7 +79,7 @@ export function FileHistory({ history, setHistory }: FileHistoryProps) {
   };
 
   const handleDelete = (id: string) => {
-    setHistory(prev => prev.filter(item => item.id !== id));
+    onDelete(id);
     const newSelection = new Set(selectedItems);
     newSelection.delete(id);
     setSelectedItems(newSelection);
@@ -112,9 +113,9 @@ export function FileHistory({ history, setHistory }: FileHistoryProps) {
   };
 
 
-  const handlePreview = (e: React.MouseEvent, file: File) => {
+  const handlePreview = (e: React.MouseEvent, file: File | Blob, name: string) => {
     e.preventDefault();
-    showPreview(file, file.name);
+    showPreview(file, name);
   };
 
   const selectedCount = selectedItems.size;
@@ -173,7 +174,7 @@ export function FileHistory({ history, setHistory }: FileHistoryProps) {
                 <TableCell className="font-medium">
                     <span 
                         className="cursor-pointer hover:underline"
-                        onClick={(e) => handlePreview(e, item.inputFile)}
+                        onClick={(e) => handlePreview(e, item.inputFile, item.inputFile.name)}
                     >
                         {item.inputFile.name}
                     </span>
@@ -190,7 +191,7 @@ export function FileHistory({ history, setHistory }: FileHistoryProps) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleDownload(item.outputBlob, getOutputFilename(item.inputFile, item.outputFileType))}>
+                        <DropdownMenuItem onClick={() => handleDownload(item.outputBlob, getOutputFilename(item.inputFile, item.outputFileType))} disabled={!item.outputBlob}>
                           <Download className="mr-2 h-4 w-4" />
                           Download
                         </DropdownMenuItem>

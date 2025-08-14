@@ -7,6 +7,8 @@ import { performConversion, getFileExtension, getFileTypeFromMime } from '@/lib/
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { Loader } from 'lucide-react';
+import { updateConversion } from '@/lib/db';
+
 
 interface ConversionProgressStepProps {
   tasks: ConversionResult[];
@@ -50,6 +52,7 @@ export function ConversionProgressStep({ tasks, onConversionComplete }: Conversi
             conversionTime: Date.now() - startTime,
           };
         }
+        await updateConversion(result); // Persist each result to DB
         newResults.push(result);
         setResults([...newResults]);
         setProgress(((i + 1) / tasks.length) * 100);

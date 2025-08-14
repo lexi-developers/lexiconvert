@@ -10,6 +10,7 @@ import { ArrowRight, Trash2 } from 'lucide-react';
 import { getFileExtension, getFileTypeFromMime, supportedConversions, OutputFormat } from '@/lib/conversions';
 import { getFileIcon } from '@/lib/icons';
 import { usePreview } from '@/context/preview-provider';
+import { addConversion } from '@/lib/db';
 
 interface FileConfigStepProps {
   files: ConversionResult[];
@@ -57,6 +58,14 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
     if(tasks.length === 0) return true;
     return tasks.some(task => !task.outputFileType);
   }, [tasks]);
+
+  const handleStartConversion = async () => {
+    // Persist all pending tasks to IndexedDB before starting
+    for (const task of tasks) {
+      await addConversion(task);
+    }
+    onConfigComplete(tasks);
+  }
 
   return (
     <div className="space-y-6">
@@ -127,7 +136,7 @@ export function FileConfigStep({ files: initialFiles, onConfigComplete, onBack }
       </div>
 
       <div className="flex justify-end items-center pt-4">
-        <Button size="lg" onClick={() => onConfigComplete(tasks)} disabled={isNextDisabled}>
+        <Button size="lg" onClick={handleStartConversion} disabled={isNextDisabled}>
           Start Conversion
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
