@@ -20,6 +20,7 @@ import {
   Database,
   Braces,
   FileJson,
+  FileArchive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -44,21 +45,31 @@ import ePub from "epubjs";
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 import { Potrace } from 'potrace';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// For Next.js, set the worker source
+if (typeof window !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url,
+  ).toString();
+}
 
 // === TYPES AND CONSTANTS ===
 
 type ConversionStatus = "idle" | "converting" | "success" | "error";
-type DocumentFileType = "docx" | "txt" | "epub" | "xlsx" | "pptx";
+type DocumentFileType = "docx" | "txt" | "epub" | "xlsx" | "pptx" | "pdf";
 type ImageFileType = "jpg" | "png" | "gif" | "bmp" | "webp" | "svg";
 type TextBasedFileType = "html" | "xml" | "csv" | "json" | "md" | "js" | "ts" | "css" | "py" | "sql";
 type FileType = DocumentFileType | ImageFileType | TextBasedFileType | "unknown";
-type OutputFormat = "pdf" | "jpg" | "png" | "webp" | "gif" | "bmp" | "svg";
+type OutputFormat = "pdf" | "jpg" | "png" | "webp" | "gif" | "bmp" | "svg" | "zip";
 
 const mimeTypeToType: Record<string, FileType> = {
   // Documents
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+  "application/pdf": "pdf",
   "text/plain": "txt",
   "application/epub+zip": "epub",
   // Images
@@ -88,7 +99,8 @@ const supportedConversions: Record<FileType, OutputFormat[]> = {
   // Documents
   docx: ["pdf"],
   xlsx: ["pdf"],
-  pptx: [], 
+  pptx: [],
+  pdf: ["png", "jpg"],
   txt: ["pdf"],
   epub: ["pdf"],
   // Images
@@ -127,7 +139,8 @@ const getFileTypeFromMime = (mime: string, extension: string): FileType => {
         'webp': 'webp', 'epub': 'epub', 'docx': 'docx', 'xlsx': 'xlsx',
         'pptx': 'pptx', 'svg': 'svg', 'html': 'html', 'htm': 'html',
         'xml': 'xml', 'csv': 'csv', 'json': 'json', 'md': 'md', 'js': 'js',
-        'ts': 'ts', 'css': 'css', 'py': 'py', 'sql': 'sql', 'txt': 'txt'
+        'ts': 'ts', 'css': 'css', 'py': 'py', 'sql': 'sql', 'txt': 'txt',
+        'pdf': 'pdf',
     };
     if (extMap[extension]) return extMap[extension];
     return "unknown";
@@ -242,7 +255,47 @@ const convertImageToPdf = async (fileType: FileType, arrayBuffer: ArrayBuffer): 
   return new Blob([pdfBytes], { type: "application/pdf" });
 }
 
-const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targetFormat: Exclude<OutputFormat, 'pdf' | 'svg'>): Promise<Blob> => {
+const convertPdfToImages = async (arrayBuffer: ArrayBuffer, outputFormat: 'png' | 'jpg', toast: (options: any) => void): Promise<Blob> => {
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
+    const numPages = pdf.numPages;
+
+    if (numPages === 0) {
+        throw new Error("PDF 檔案沒有任何頁面。");
+    }
+
+    toast({ title: "開始轉換 PDF", description: `正在將 ${numPages} 個頁面轉換為 ${outputFormat.toUpperCase()} 圖片...` });
+
+    const zip = new JSZip();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error("無法建立 Canvas Context");
+
+    for (let i = 1; i <= numPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 2.0 }); // Use higher scale for better quality
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        const renderContext = {
+            canvasContext: ctx,
+            viewport: viewport
+        };
+        await page.render(renderContext).promise;
+
+        const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, `image/${outputFormat}`, 0.95));
+        if (blob) {
+            zip.file(`page_${i}.${outputFormat}`, blob);
+        }
+        page.cleanup();
+    }
+    canvas.remove();
+
+    toast({ title: "壓縮中...", description: "正在將所有圖片壓縮成 ZIP 檔案。" });
+    return await zip.generateAsync({ type: "blob" });
+};
+
+const convertImage = async (arrayBuffer: ArrayBuffer, sourceType: FileType, targetFormat: Exclude<OutputFormat, 'pdf' | 'svg' | 'zip'>): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -310,6 +363,7 @@ export function Converter() {
   const [outputFormat, setOutputFormat] = useState<OutputFormat | null>(null);
   const [status, setStatus] = useState<ConversionStatus>("idle");
   const [convertedFileUrl, setConvertedFileUrl] = useState<string | null>(null);
+  const [convertedFileType, setConvertedFileType] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -318,12 +372,18 @@ export function Converter() {
   const availableOutputFormats = useMemo(() => {
     if (!file || fileType === "unknown") return [];
     
+    let formats = supportedConversions[fileType] || [];
+    
+    if (fileType === 'pdf') {
+        return formats;
+    }
+
     const extension = getFileExtension(file.name) as OutputFormat;
     // User can convert an SVG to an SVG, which makes no sense.
-    if (fileType === 'svg' && supportedConversions[fileType]) {
-        return supportedConversions[fileType].filter(f => f !== 'svg') || [];
+    if (fileType === 'svg' && formats) {
+        return formats.filter(f => f !== 'svg') || [];
     }
-    return (supportedConversions[fileType] || []).filter(f => f !== extension);
+    return formats.filter(f => f !== extension);
     
   }, [file, fileType]);
 
@@ -333,6 +393,7 @@ export function Converter() {
     setOutputFormat(null);
     setStatus("idle");
     setErrorMessage("");
+    setConvertedFileType("");
     if (convertedFileUrl) {
       URL.revokeObjectURL(convertedFileUrl);
       setConvertedFileUrl(null);
@@ -371,8 +432,11 @@ export function Converter() {
     setFile(selectedFile);
     setFileType(detectedType);
     
-    const possibleFormats = (supportedConversions[detectedType] || []).filter(f => f !== extension);
-
+    let possibleFormats = (supportedConversions[detectedType] || []);
+    if (detectedType !== 'pdf') {
+        possibleFormats = possibleFormats.filter(f => f !== extension);
+    }
+    
     if (possibleFormats.length > 0) {
       setOutputFormat(possibleFormats[0]);
     } else {
@@ -398,14 +462,17 @@ export function Converter() {
     setStatus("converting");
     setConvertedFileUrl(null);
     setErrorMessage("");
+    setConvertedFileType("");
 
     try {
       const arrayBuffer = await file.arrayBuffer();
       let blob: Blob;
+      let finalOutputFormat = outputFormat;
 
-      const codeFileTypes: FileType[] = ['js', 'ts', 'css', 'py', 'sql', 'xml', 'html', 'md'];
-
-      if (outputFormat === 'pdf') {
+      if (fileType === 'pdf' && (outputFormat === 'png' || outputFormat === 'jpg')) {
+          blob = await convertPdfToImages(arrayBuffer, outputFormat, toast);
+          finalOutputFormat = 'zip';
+      } else if (outputFormat === 'pdf') {
           switch(fileType) {
               case 'epub': blob = await convertEpubToPdf(arrayBuffer, toast); break;
               case 'docx': blob = await convertDocxToPdf(arrayBuffer, toast); break;
@@ -433,15 +500,16 @@ export function Converter() {
           }
       }
       else {
-        blob = await convertImage(arrayBuffer, fileType, outputFormat);
+        blob = await convertImage(arrayBuffer, fileType, outputFormat as Exclude<OutputFormat, 'pdf' | 'svg' | 'zip'>);
       }
       
       const url = URL.createObjectURL(blob);
       setConvertedFileUrl(url);
+      setConvertedFileType(finalOutputFormat);
       setStatus("success");
       toast({
         title: "轉換成功！",
-        description: `您的 ${outputFormat.toUpperCase()} 檔案已準備就緒。`,
+        description: `您的 ${finalOutputFormat.toUpperCase()} 檔案已準備就緒。`,
       });
 
     } catch (err: any) {
@@ -462,7 +530,8 @@ export function Converter() {
   const getOutputFilename = () => {
     if (!file || !outputFormat) return "converted.file";
     const nameWithoutExtension = file.name.split('.').slice(0, -1).join('.');
-    return `${nameWithoutExtension || 'converted'}.${outputFormat}`;
+    const finalExtension = (fileType === 'pdf' && (outputFormat === 'png' || outputFormat === 'jpg')) ? 'zip' : outputFormat;
+    return `${nameWithoutExtension || 'converted'}.${finalExtension}`;
   }
 
   const getFileIcon = () => {
@@ -492,6 +561,13 @@ export function Converter() {
     return extensions.join(',');
   }, []);
 
+  const getSelectLabel = (format: OutputFormat) => {
+    if (fileType === 'pdf' && (format === 'png' || format === 'jpg')) {
+        return `${format.toUpperCase()} (as .ZIP)`;
+    }
+    return format.toUpperCase();
+  }
+
   return (
     <Card className="w-full shadow-lg">
       <CardHeader>
@@ -517,7 +593,7 @@ export function Converter() {
             <p className="mt-4 text-center text-muted-foreground">
               <span className="font-semibold text-primary">點擊上傳</span> 或拖放檔案
             </p>
-            <p className="text-xs text-muted-foreground mt-1">支援 DOCX, XLSX, TXT, EPUB, 圖片, 程式碼等多種格式</p>
+            <p className="text-xs text-muted-foreground mt-1">支援 PDF, DOCX, XLSX, TXT, EPUB, 圖片, 程式碼等多種格式</p>
             <input
               ref={fileInputRef}
               type="file"
@@ -557,7 +633,7 @@ export function Converter() {
                 <SelectContent>
                     {availableOutputFormats.length > 0 ? (
                         availableOutputFormats.map(format => (
-                            <SelectItem key={format} value={format}>{format.toUpperCase()}</SelectItem>
+                            <SelectItem key={format} value={format}>{getSelectLabel(format)}</SelectItem>
                         ))
                     ) : (
                         <SelectItem value="none" disabled>無可用格式</SelectItem>
@@ -586,7 +662,9 @@ export function Converter() {
 
         {status === "success" && convertedFileUrl && (
           <Alert variant="default" className="bg-green-50 border-green-200">
-            <CheckCircle className="h-4 w-4 text-green-600" />
+            <div className="flex items-center text-green-600">
+                {convertedFileType === 'zip' ? <FileArchive className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+            </div>
             <AlertTitle className="text-green-800">轉換成功！</AlertTitle>
             <AlertDescription className="flex flex-col sm:flex-row justify-between items-center gap-2 mt-2 text-green-700">
               <span className="font-semibold truncate">{getOutputFilename()}</span>
