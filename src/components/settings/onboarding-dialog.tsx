@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { DialogHeader, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useTheme } from 'next-themes';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -65,28 +65,28 @@ export function OnboardingDialog({ onComplete }: OnboardingDialogProps) {
             <div className="w-full max-w-md mx-auto p-8 border rounded-lg shadow-lg">
                 {step === 1 && (
                     <>
-                        <DialogHeader>
-                            <DialogTitle className="text-2xl text-center">Welcome to LexiConvert</DialogTitle>
-                            <DialogDescription className="text-center pt-2">
+                        <div className="text-center sm:text-left flex flex-col space-y-1.5">
+                            <h2 className="text-2xl font-semibold leading-none tracking-tight text-center">Welcome to LexiConvert</h2>
+                            <p className="text-sm text-muted-foreground text-center pt-2">
                                 A powerful, privacy-focused file conversion tool.
-                            </DialogDescription>
-                        </DialogHeader>
+                            </p>
+                        </div>
                         <div className="py-6 text-center text-muted-foreground">
                             <p>All conversions run locally in your browser. Your files are never uploaded to any server.</p>
                         </div>
-                        <DialogFooter>
+                        <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
                             <Button className="w-full" size="lg" onClick={handleNext}>Get Started</Button>
-                        </DialogFooter>
+                        </div>
                     </>
                 )}
                 {step === 2 && (
                     <>
-                        <DialogHeader>
-                            <DialogTitle className="text-2xl text-center">Choose Your Theme</DialogTitle>
-                            <DialogDescription className="text-center pt-2">
+                         <div className="text-center sm:text-left flex flex-col space-y-1.5">
+                            <h2 className="text-2xl font-semibold leading-none tracking-tight text-center">Choose Your Theme</h2>
+                            <p className="text-sm text-muted-foreground text-center pt-2">
                                 Select a theme that's easy on your eyes.
-                            </DialogDescription>
-                        </DialogHeader>
+                            </p>
+                        </div>
                         <div className="py-6">
                             <RadioGroup defaultValue="system" onValueChange={handleThemeChange} className="grid grid-cols-3 gap-4">
                                 <div>
@@ -109,19 +109,19 @@ export function OnboardingDialog({ onComplete }: OnboardingDialogProps) {
                                 </div>
                             </RadioGroup>
                         </div>
-                        <DialogFooter>
+                        <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
                             <Button className="w-full" size="lg" onClick={handleNext}>Next</Button>
-                        </DialogFooter>
+                        </div>
                     </>
                 )}
                 {step === 3 && (
                     <>
-                        <DialogHeader>
-                            <DialogTitle className="text-2xl text-center">Set a Password (Optional)</DialogTitle>
-                            <DialogDescription className="text-center pt-2">
+                        <div className="text-center sm:text-left flex flex-col space-y-1.5">
+                            <h2 className="text-2xl font-semibold leading-none tracking-tight text-center">Set a Password (Optional)</h2>
+                            <p className="text-sm text-muted-foreground text-center pt-2">
                                 Secure your session. You'll be asked for this password every time you visit.
-                            </DialogDescription>
-                        </DialogHeader>
+                            </p>
+                        </div>
                         <div className="py-6 space-y-4">
                              <Input 
                                 type="password" 
@@ -136,24 +136,24 @@ export function OnboardingDialog({ onComplete }: OnboardingDialogProps) {
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                              />
                         </div>
-                        <DialogFooter className="flex-col gap-2">
+                        <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 flex-col gap-2">
                             <Button className="w-full" size="lg" onClick={handleSetPassword} disabled={tempPassword.length > 0 && tempPassword !== confirmPassword}>Set Password & Continue</Button>
                             <Button className="w-full" variant="ghost" onClick={handleSkipPassword}>Skip</Button>
-                        </DialogFooter>
+                        </div>
                     </>
                 )}
                  {step === 4 && (
                     <>
                         <div className="text-center py-6">
                             <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                            <DialogTitle className="text-2xl text-center">All Set!</DialogTitle>
-                            <DialogDescription className="text-center pt-2">
+                            <h2 className="text-2xl text-center font-semibold leading-none tracking-tight">All Set!</h2>
+                            <p className="text-sm text-muted-foreground text-center pt-2">
                                 Welcome to LexiConvert.
-                            </DialogDescription>
+                            </p>
                         </div>
-                        <DialogFooter>
+                        <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
                             <Button className="w-full" size="lg" onClick={handleFinish}>Start Converting</Button>
-                        </DialogFooter>
+                        </div>
                     </>
                 )}
             </div>
